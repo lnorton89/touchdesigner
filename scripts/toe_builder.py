@@ -183,7 +183,12 @@ def make_node_n(node: Node, parent_path: str = "") -> str:
     type_str = f"{node.optype.upper()}:{node.subtype}"
     lines = [type_str]
     lines.append(f"tile {node.x} {node.y} {node.w} {node.h}")
-    lines.append(f"flags =  {node.flags}")
+    # Containers need viewer 1 to show their contents
+    if node.optype == "COMP":
+        flags = "viewer 1 current on " + node.flags if "viewer" not in node.flags else node.flags
+    else:
+        flags = node.flags
+    lines.append(f"flags =  {flags}")
     lines.append(f"color {node.color}")
     lines.append("end")
     return "\n".join(lines)
