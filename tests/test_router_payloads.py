@@ -1,6 +1,7 @@
 import unittest
 
 from td_components.llm_model_router import router_http
+from td_components.llm_model_router import router_callbacks
 from td_components.llm_model_router.ModelRouterExt import ModelRouter
 
 
@@ -161,15 +162,31 @@ class ModelRouterTests(unittest.TestCase):
 
     def test_reset_clears_runtime_state_but_retry_preserves_last_request(self):
         router = ModelRouter()
-        first_id = router.request(prompt="hello", trigger_source="dat_change", dispatch=False)
+        first_id = router.request(
+            prompt="hello", trigger_source="dat_table_change", dispatch=False
+        )
+        router.apply_result(
+            {
+                "request_id": first_id,
+                "status": "error",
+                "response_text": "",
+                "error_text": "expected test error",
+            }
+        )
 
         reset_state = router.reset()
         retry_id = router.retry(dispatch=False)
 
         self.assertEqual(reset_state["state"], "idle")
+        self.assertEqual(reset_state["complete_count"], 0)
+        self.assertEqual(reset_state["error_count"], 0)
+        self.assertEqual(reset_state["response_text"], "")
+        self.assertEqual(reset_state["error_text"], "")
         self.assertGreater(retry_id, first_id)
         self.assertEqual(router.state["state"], "running")
         self.assertEqual(router._last_envelope["trigger_source"], "retry")
+        self.assertEqual(router.state["retry_count"], 1)
+        self.assertEqual(router.state["status_channels"]["retry_count"], 1)
 
     def test_apply_result_owns_callback_payload_and_output_state(self):
         class CallbackTarget:
@@ -217,6 +234,80 @@ class ModelRouterTests(unittest.TestCase):
 
         self.assertEqual(router.state["state"], "running")
         self.assertEqual(router.state["response_text"], "")
+
+    def test_callback_helpers_call_central_router_methods(self):
+        class RouterSpy:
+            def __init__(self):
+                self.calls = []
+
+            def request(self, **kwargs):
+                self.calls.append(("request", kwargs))
+                return 101
+
+            def reset(self):
+                self.calls.append(("reset", {}))
+                return {}
+
+            def retry(self):
+                self.calls.append(("retry", {}))
+                return 102
+
+        class Ext:
+            pass
+
+        class Owner:
+            pass
+
+        class Par:
+            pass
+
+        owner = Owner()
+        owner.ext = Ext()
+        owner.ext.ModelRouter = RouterSpy()
+        par = Par()
+        par.owner = owner
+
+        self.assertEqual(router_callbacks.onTriggerPulse(par), 101)
+        router_callbacks.onResetPulse(par)
+        self.assertEqual(router_callbacks.onRetryPulse(par), 102)
+
+        self.assertEqual(
+            owner.ext.ModelRouter.calls[0],
+            ("request", {"trigger_source": "pulse"}),
+        )
+        self.assertEqual(owner.ext.ModelRouter.calls[1][0], "reset")
+        self.assertEqual(owner.ext.ModelRouter.calls[2][0], "retry")
+
+    def test_dat_table_change_uses_distinct_trigger_source(self):
+        class RouterSpy:
+            def __init__(self):
+                self.kwargs = None
+
+            def request(self, **kwargs):
+                self.kwargs = kwargs
+                return 201
+
+        class Ext:
+            pass
+
+        class Dat:
+            text = "from table"
+
+        class Owner:
+            pass
+
+        owner = Owner()
+        owner.ext = Ext()
+        owner.ext.ModelRouter = RouterSpy()
+        dat = Dat()
+        dat.owner = owner
+
+        router_callbacks.onPromptTableChange(dat)
+
+        self.assertEqual(owner.ext.ModelRouter.kwargs["prompt"], "from table")
+        self.assertEqual(
+            owner.ext.ModelRouter.kwargs["trigger_source"], "dat_table_change"
+        )
 
 
 if __name__ == "__main__":

@@ -35,4 +35,4 @@ def onPromptTableChange(dat: Any, cells: Any = None, prev: Any = None) -> int:
     prompt = getattr(dat, "text", None)
     if prompt is None:
         prompt = str(dat)
-    return router.request(prompt=str(prompt), trigger_source="dat_change")
+    return router.request(prompt=str(prompt), trigger_source="dat_table_change")

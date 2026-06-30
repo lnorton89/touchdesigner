@@ -52,6 +52,7 @@ class ModelRouter:
         self._error_text = ""
         self._complete_count = 0
         self._error_count = 0
+        self._retry_count = 0
         self._status_channels = self._build_status_channels()
 
     def request(
@@ -89,6 +90,9 @@ class ModelRouter:
         self._last_result = None
         self._response_text = ""
         self._error_text = ""
+        self._complete_count = 0
+        self._error_count = 0
+        self._retry_count = 0
         self._status_channels = self._build_status_channels()
         self._write_outputs()
         return self._snapshot_state()
@@ -97,6 +101,7 @@ class ModelRouter:
         if not self._last_envelope:
             raise RuntimeError("no previous request to retry")
         envelope = router_http.rebuild_retry_envelope(self._last_envelope)
+        self._retry_count += 1
         self._mark_running(envelope)
         self._write_outputs()
         if dispatch:
@@ -197,6 +202,7 @@ class ModelRouter:
             "request_id": self._active_request_id or 0,
             "complete_count": self._complete_count,
             "error_count": self._error_count,
+            "retry_count": self._retry_count,
             "response_text": self._response_text,
             "error_text": self._error_text,
             "status_channels": dict(self._status_channels),
@@ -212,6 +218,7 @@ class ModelRouter:
             "request_id": request_id,
             "complete_count": self._complete_count,
             "error_count": self._error_count,
+            "retry_count": self._retry_count,
         }
 
     def _write_outputs(self) -> None:

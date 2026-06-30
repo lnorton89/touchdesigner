@@ -31,6 +31,8 @@ Both parameter pulse and DAT/table-change triggers call the same central `ModelR
 
 Worker code receives only plain dictionaries and returns plain dictionaries. DAT/CHOP-style output updates and callback invocation belong to the Router extension handoff path, not the HTTP adapter.
 
+Status snapshots expose DAT/CHOP-ready values: `running`, `done`, `error`, `request_id`, `complete_count`, `error_count`, and `retry_count`. Reset clears runtime status, response text, error text, and counters while preserving the configured provider, endpoint, model, prompt DAT reference, and callback target.
+
 ## Distribution Notes
 
 This scaffold uses localhost defaults and contains no private filesystem paths in runtime config, no embedded credentials, and no hard dependency on machine-specific TouchDesigner state. Phase 4 packaging should re-check extension reload/source-export behavior inside the target TouchDesigner build before exporting a distributable `.tox`.
