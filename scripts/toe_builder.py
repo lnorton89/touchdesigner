@@ -51,6 +51,7 @@ def _find_template_toe() -> Optional[Path]:
         return None
 
     for candidate in [
+        td_bin.parent / "Samples" / "Setup" / "Example" / "NewProject.toe",
         td_bin.parent / "Samples" / "Setup" / "Base" / "NewProject.toe",
         td_bin.parent / "Samples" / "Learn" / "PythonExamples.toe",
     ]:
@@ -384,13 +385,24 @@ class ToeBuilder:
         for node in self._nodes:
             self._write_node_files(project_dir, node)
 
-        # Generate TOC from the work dir
+        # Generate TOC with correct order: root files, project1/ children, .application last
         toc_lines = []
-        expanded_name = self._expanded_dir.name
-        for f in sorted(self._expanded_dir.rglob("*")):
-            if f.is_file():
-                rel = str(f.relative_to(self._expanded_dir)).replace("\\", "/")
-                toc_lines.append(rel)
+        # Root files in canonical order (matching TD's default sort)
+        for name in [".build", ".start", ".grps", ".root", ".parm",
+                      "project1.n", "project1.parm", "project1.panel"]:
+            p = self._expanded_dir / name
+            if p.is_file():
+                toc_lines.append(name)
+        # project1/ children (recursive sort by path)
+        project_dir = self._expanded_dir / "project1"
+        if project_dir.is_dir():
+            for f in sorted(project_dir.rglob("*")):
+                if f.is_file():
+                    rel = "project1/" + str(f.relative_to(project_dir)).replace("\\", "/")
+                    toc_lines.append(rel)
+        # Application last
+        if (self._expanded_dir / ".application").is_file():
+            toc_lines.append(".application")
 
         self._toc_path = self._work_dir / f"{output.stem}.toe.toc"
         self._toc_path.write_bytes(("\n".join(toc_lines) + "\n").encode("ascii"))
