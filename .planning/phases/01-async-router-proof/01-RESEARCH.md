@@ -426,22 +426,22 @@ def _apply_result(self, payload):
 | A4 | Stale async results can overwrite newer requests unless request ids are checked. | Common Pitfalls | If the router serializes requests and disallows overlap, this risk is reduced. |
 | A5 | Ollama daemon/model availability is runtime state that should be handled as recoverable error output. | Common Pitfalls | If installer automation becomes Phase 1 scope, handling may move earlier. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which exact TouchDesigner build will implementation target?**
    - What we know: Derivative docs say Thread Manager exists in TouchDesigner 2023.31500+. [CITED: https://docs.derivative.ca/Python_threading_in_TouchDesigner]
    - What's unclear: The installed TD build was not probed from this shell session. [VERIFIED: local environment probe]
-   - Recommendation: Planner should add a Wave 0 check inside TD for Python version, Thread Manager availability, and extension reload behavior. [ASSUMED]
+   - Resolution: Plan 01 now includes a blocking TD runtime checkpoint before implementation tasks. Execution must verify the installed TD build, embedded Python version, Thread Manager availability, and extension reload behavior. If Thread Manager is unavailable, execution must document the fallback path before continuing. [ASSUMED]
 
 2. **Should Phase 1 install `httpx` or use a no-install fallback?**
    - What we know: `httpx` is officially documented and PyPI latest is `0.28.1`; GSD seam flags it SUS only due to unknown downloads. [CITED: https://www.python-httpx.org/quickstart] [VERIFIED: PyPI]
    - What's unclear: Whether the user wants external dependency setup before Phase 4 packaging. [VERIFIED: .planning/ROADMAP.md]
-   - Recommendation: Use `httpx` if human checkpoint approves; otherwise use stdlib fallback and leave install hardening to Phase 4. [ASSUMED]
+   - Resolution: Plan 02 keeps this as an intentional blocking human checkpoint. If `httpx==0.28.1` is approved, execution may use it in the external Python environment. If not approved, execution must keep a stdlib `urllib.request` fallback active for Phase 1 and defer dependency hardening to Phase 4. [ASSUMED]
 
 3. **How should callback target be represented in TD?**
    - What we know: Context prefers callback DAT/operator target, with room for operator path plus method name. [VERIFIED: .planning/phases/01-async-router-proof/01-CONTEXT.md]
    - What's unclear: Which convention feels best once implemented in TD. [ASSUMED]
-   - Recommendation: Start with `Callbacktarget` OP parameter and optional `Callbackmethod` string defaulting to `onRouterResult(payload)`. [ASSUMED]
+   - Resolution: Use a `Callbacktarget` OP parameter plus optional `Callbackmethod` string defaulting to `onRouterResult(payload)`. If the target is a DAT callback script, the helper should call/write a structured payload there; if the target is an operator extension, invoke the configured method during TD-side result handoff only. [ASSUMED]
 
 ## Environment Availability
 
