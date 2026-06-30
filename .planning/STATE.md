@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-30T04:38:51.712Z"
+status: uat_pending
+stopped_at: Phase 1 TouchDesigner UAT pending
+last_updated: "2026-06-30T05:15:00.000Z"
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 3
+  percent: 18
 ---
 
 # State: Native LLM Operators for TouchDesigner
@@ -26,23 +26,23 @@ See: .planning/PROJECT.md (updated 2026-06-30)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| 1 - Async Router Proof | Pending | 0% |
+| 1 - Async Router Proof | UAT pending | 75% |
 | 2 - Agent Conversation Loop | Pending | 0% |
 | 3 - TD Tool Calling | Pending | 0% |
 | 4 - Packaging and Dependency Bootstrap | Pending | 0% |
 
 ## Current Phase
 
-No phase has started yet.
+Phase 1 implementation plans are complete. TouchDesigner runtime UAT is pending before the phase can be marked complete.
 
 ## Notes
 
-- Start with `$gsd-discuss-phase 1` to clarify the async TD integration approach.
-- Phase 1 should validate the frame-safe request pattern before adding agent/tool complexity.
-- Research files live in `.planning/research/`.
+- Phase 1 shell-verifiable implementation is complete.
+- Automated tests pass with `python -m unittest tests.test_router_payloads -v`.
+- Manual TouchDesigner smoke verification is tracked in `.planning/phases/01-async-router-proof/01-UAT.md`.
 
 ## Session
 
-**Last session:** 2026-06-30T04:38:51.703Z
-**Stopped at:** Phase 1 context gathered
-**Resume file:** .planning/phases/01-async-router-proof/01-CONTEXT.md
+**Last session:** 2026-06-30T05:15:00.000Z
+**Stopped at:** Phase 1 TouchDesigner UAT pending
+**Resume file:** .planning/phases/01-async-router-proof/01-UAT.md
