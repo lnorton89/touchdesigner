@@ -41,8 +41,14 @@ Phase 1 implementation plans are complete. TouchDesigner runtime UAT is pending 
 - Automated tests pass with `python -m unittest tests.test_router_payloads -v`.
 - Manual TouchDesigner smoke verification is tracked in `.planning/phases/01-async-router-proof/01-UAT.md`.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 250629-001 | Add llama.cpp provider support with default endpoint and launcher script | 2026-06-29 | c5142e9 | [250629-001-llama-cpp-provider](./quick/250629-001-llama-cpp-provider/) |
+
 ## Session
 
-**Last session:** 2026-06-30T05:15:00.000Z
+**Last session:** 2026-06-29T22:17:00.000Z
 **Stopped at:** Phase 1 TouchDesigner UAT pending
 **Resume file:** .planning/phases/01-async-router-proof/01-UAT.md
