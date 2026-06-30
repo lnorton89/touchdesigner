@@ -9,7 +9,7 @@ As a TouchDesigner builder, I want a Model Router COMP to send a local LLM promp
 - `td_components/llm_model_router/ModelRouterExt.py`: TD-facing Router extension, custom parameter contract, central `request`, reset, retry, status snapshots, worker submission, and TD-side `_apply_result`.
 - `td_components/llm_model_router/router_http.py`: pure-Python OpenAI-compatible request/response and error normalization. No TouchDesigner object access.
 - `td_components/llm_model_router/router_callbacks.py`: pulse, reset, retry, and DAT/table-change callback helpers that call the Router API.
-- `examples/phase1_async_router/`: reproducible local Ollama demo instructions and callback payload display helpers.
+- `demo/`: reproducible local Ollama demo instructions and callback payload display helpers.
 - `tests/test_router_payloads.py`: stdlib `unittest` coverage for envelopes, parsing, errors, state, reset, retry, and stale-result handling.
 
 ## Runtime Boundaries

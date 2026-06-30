@@ -194,7 +194,7 @@ td_components/
 │   ├── ModelRouterExt.py   # Router extension; central request API and TD output writes
 │   ├── router_callbacks.py # Parameter callbacks and DAT Execute callback helpers
 │   └── README.md           # Setup/demo notes for Phase 1
-examples/
+demo/
 └── phase1_async_router/    # Demo network notes/exported helper scripts
 tests/
 └── test_router_payloads.py # Pure-Python tests for request/response normalization

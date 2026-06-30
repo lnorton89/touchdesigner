@@ -84,8 +84,12 @@ touchdesigner/
 │   ├── router_callbacks.py           # Parameter and DAT callback handlers
 │   └── README.md                     # Component docs
 ├── scripts/
-│   └── start-llama-server.ps1        # llama.cpp server launcher
-├── examples/phase1_async_router/     # Demo network helpers
+│   ├── bootstrap-venv.ps1            # External venv setup
+│   ├── start-llama-server.ps1        # llama.cpp server launcher
+│   ├── setup-td-path.py              # TD sys.path injection
+│   └── check-deps.py                 # Dependency health check
+├── demo/                             # TD demo project files
+├── tox/                              # .tox component build guide
 ├── tests/
 │   └── test_router_payloads.py       # Unit tests
 └── .planning/                        # Project planning and phase artifacts

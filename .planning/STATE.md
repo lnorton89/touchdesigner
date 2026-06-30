@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: uat_pending
 stopped_at: Phase 1 TouchDesigner UAT pending
-last_updated: "2026-06-30T05:15:00.000Z"
+last_updated: "2026-06-29T22:30:00.000Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -49,6 +49,6 @@ Phase 1 implementation plans are complete. TouchDesigner runtime UAT is pending 
 
 ## Session
 
-**Last session:** 2026-06-29T22:17:00.000Z
-**Stopped at:** Phase 1 TouchDesigner UAT pending
+**Last session:** 2026-06-29T22:30:00.000Z
+**Stopped at:** Phase 1 UAT blocked (needs .tox), Phase 4 packaging structure built. Next: construct .tox in TD per tox/STRUCTURE.md, then re-run UAT.
 **Resume file:** .planning/phases/01-async-router-proof/01-UAT.md
