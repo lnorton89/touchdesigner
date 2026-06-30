@@ -546,14 +546,20 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
         name="llm_model_router", optype="COMP", subtype="base",
         x=25, y=25, w=150, h=100,
         params={
-            "extension1": 'me.op("ext_code").mod.__dict__["Extension"](me)',
+            "extension1": "op.ext_code.mod.Extension(me)",
             "extname1": "ModelRouter",
             "promoteextension1": "on",
+            "iop": "0",
+            "iop0shortcut": "ext_code",
+            "iop0op": "ext_code",
         },
         parm_types={
             "extension1": 256,
             "extname1": 256,
             "promoteextension1": 256,
+            "iop": 0,
+            "iop0shortcut": 17,
+            "iop0op": 17,
         },
         children=[
             Node(name="ext_code", optype="DAT", subtype="text",
