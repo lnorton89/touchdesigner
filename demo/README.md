@@ -10,10 +10,23 @@ demo/
 ├── README.md               ← this file
 ├── callbacks.py            ← Callback and utility functions for TD
 ├── build_network.py        ← TD script that auto-constructs the network
-└── startup.py              ← Startup script for venv injection + module registration
+├── startup.py              ← Startup script for venv injection + module registration
+└── demo.toe                ← Auto-generated TouchDesigner project (open this)
 ```
 
 ## Quick Start
+
+### 0. Open the demo project
+
+Double-click `demo/demo.toe` to open the pre-built TouchDesigner project,
+or run `File → Open` in TD. The network contains a `base_llm_demo` container
+with all operators pre-placed.
+
+To regenerate the `.toe` from source (requires TouchDesigner installed):
+
+```powershell
+python scripts/generate-demo-toe.py
+```
 
 ### 1. Start an LLM server
 
