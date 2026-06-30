@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 import time
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 from urllib import error as urlerror
@@ -251,18 +252,37 @@ def rebuild_retry_envelope(
     )
 
 
+def resolve_api_key(envelope: Mapping[str, Any]) -> Optional[str]:
+    """Resolve an API key from the envelope's api_key_source field.
+
+    The field can reference an environment variable name or contain a literal key.
+    Returns None when no key is configured.
+    """
+    source = str(envelope.get("api_key_source", "") or "").strip()
+    if not source:
+        return None
+    env_val = os.environ.get(source)
+    if env_val is not None:
+        return env_val
+    return source
+
+
 def call_openai_compatible(envelope: Mapping[str, Any], opener: Any = None) -> Dict[str, Any]:
     """POST a non-streaming chat completion request and normalize the result."""
 
     started = time.perf_counter()
     body = json.dumps(build_openai_chat_payload(envelope)).encode("utf-8")
+    headers: Dict[str, str] = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    api_key = resolve_api_key(envelope)
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = urlrequest.Request(
         endpoint_for(envelope),
         data=body,
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
     timeout = float(envelope.get("timeout", DEFAULT_TIMEOUT_SECONDS))

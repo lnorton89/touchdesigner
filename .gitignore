@@ -1,2 +1,14 @@
 __pycache__/
 *.py[cod]
+
+# External virtual environment
+.venv/
+venv/
+
+# TouchDesigner export artifacts
+*.tox
+*.toe
+
+# OS metadata
+.DS_Store
+Thumbs.db

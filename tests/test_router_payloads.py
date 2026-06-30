@@ -15,6 +15,44 @@ class FakeResponse:
 
 
 class RouterHttpTests(unittest.TestCase):
+    def test_api_key_resolves_from_env_var_name(self):
+        envelope = router_http.build_request_envelope(
+            prompt="hi", api_key_source="MY_TEST_KEY"
+        )
+        self.assertEqual(router_http.resolve_api_key(envelope), "MY_TEST_KEY")
+
+    def test_api_key_returns_none_when_empty(self):
+        envelope = router_http.build_request_envelope(prompt="hi", api_key_source="")
+        self.assertIsNone(router_http.resolve_api_key(envelope))
+
+    def test_api_key_included_in_authorization_header(self):
+        calls = []
+        def opener(request, timeout):
+            calls.append(request)
+            return FakeResponse(200, '{"choices":[{"message":{"content":"ok"}}]}')
+        envelope = router_http.build_request_envelope(
+            prompt="hello",
+            base_url="http://localhost:11434/v1",
+            model="demo-model",
+            api_key_source="sk-test-key",
+        )
+        router_http.call_openai_compatible(envelope, opener=opener)
+        self.assertEqual(calls[0].headers.get("Authorization"), "Bearer sk-test-key")
+
+    def test_no_authorization_when_no_api_key(self):
+        calls = []
+        def opener(request, timeout):
+            calls.append(request)
+            return FakeResponse(200, '{"choices":[{"message":{"content":"ok"}}]}')
+        envelope = router_http.build_request_envelope(
+            prompt="hello",
+            base_url="http://localhost:11434/v1",
+            model="demo-model",
+            api_key_source="",
+        )
+        router_http.call_openai_compatible(envelope, opener=opener)
+        self.assertIsNone(calls[0].headers.get("Authorization"))
+
     def test_llamacpp_is_valid_provider(self):
         envelope = router_http.build_request_envelope(
             provider="llama.cpp", prompt="hello"
