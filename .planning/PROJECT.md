@@ -53,6 +53,7 @@ The intended operator family has four to five layers:
 - **Runtime**: TouchDesigner embedded Python is limited and version-pinned - do not depend on pip installing into TD itself.
 - **Performance**: Network calls must not block the main TD thread - frame stalls are project-breaking.
 - **Packaging**: Deliverable must be a reusable `.tox` component - the operator family should travel between TD projects.
+- **Distribution**: The project will be distributed later - avoid decisions that assume a single local machine, private paths, embedded credentials, or unreproducible setup.
 - **Platform**: Target Windows first - most target users are Windows/NVIDIA TD users.
 - **Portability**: Avoid hard-coded Windows-only paths where reasonable - macOS support remains a stretch goal.
 - **Security**: API keys should be stored locally and not embedded into saved `.toe` project files.
@@ -67,6 +68,7 @@ The intended operator family has four to five layers:
 | Use an external Python virtual environment for dependencies | Keeps TD's embedded Python clean and avoids unsupported package installs | Pending |
 | Treat local OpenAI-compatible endpoints as first-class | Day-to-day target is local model use, especially Ollama | Pending |
 | Start with one working tool-call round trip | Demonstrates the agent/tool architecture before expanding utilities | Pending |
+| Preserve a path to later distribution | The toolkit is intended to be shared beyond this machine, so early prototypes should avoid private assumptions | Pending |
 
 ## Evolution
 

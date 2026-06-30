@@ -78,6 +78,7 @@
 
 - User delegated Phase 1 discussion decisions with "use best judgement."
 - Exact implementation strategy for worker execution and TD callback mechanics is left to research/planning, constrained by the captured behavior decisions.
+- User later clarified that the project will be distributed. This was captured as a Phase 1 constraint: avoid hardcoded private paths, embedded credentials, unclear namespacing, or local-only setup assumptions even in the proof.
 
 ## Deferred Ideas
 

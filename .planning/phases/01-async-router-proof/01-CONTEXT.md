@@ -10,6 +10,8 @@ Phase 1 delivers the first working TouchDesigner-native LLM request path: a Mode
 
 This phase does not build the full Agent, tool calling, conversation history, RAG, voice, GLSL repair, or `.tox` packaging workflow. It creates the stable request gateway those later phases will build on.
 
+Because the project is intended for later distribution, Phase 1 should avoid throwaway assumptions that would make packaging painful: no hardcoded user-specific paths, no embedded credentials, no opaque local-only setup, and no names that would conflict with TD projects when the component is shared.
+
 </domain>
 
 <decisions>
@@ -29,6 +31,11 @@ This phase does not build the full Agent, tool calling, conversation history, RA
 - **D-07:** The first Router COMP should feel like a real TD operator with explicit custom parameters, not a script box. Required visible params: provider type, base URL, model, timeout, prompt/input DAT reference, callback target, trigger pulse, reset pulse, retry pulse, and optional request id/status display.
 - **D-08:** Required outputs: response DAT, status/error DAT, and status CHOP channels for at least `running`, `done`, `error`, and a monotonically changing `request_id` or `complete_count`.
 - **D-09:** Keep the surface intentionally small. API key persistence/secrets handling remains Phase 4, but Phase 1 should leave a visible API key source placeholder or disabled field so the eventual flow has a home.
+
+### Distribution Readiness
+- **D-16:** Phase 1 is still a proof, but it should be shaped as a future distributable component: stable operator names, predictable custom parameter names, and no machine-specific paths in saved examples.
+- **D-17:** Demo defaults should be safe to share. Local defaults like `http://localhost:11434` are acceptable; private filesystem paths, API keys, or user-specific TD project paths are not.
+- **D-18:** Any setup assumptions discovered during Phase 1 should be documented for Phase 4 packaging rather than hidden in ad hoc local state.
 
 ### Proof of Nonblocking
 - **D-10:** The nonblocking proof should be explicit. Include a deliberately slow request or simulated delay case so a user can see TD continue running while the request is in flight.
@@ -87,6 +94,7 @@ This phase does not build the full Agent, tool calling, conversation history, RA
 - Phase 1 should prove both a button-like pulse workflow and a DAT/table-change network workflow.
 - Callback handoff should be visible enough that later Agent and tool phases can build on it confidently.
 - Reset/retry ergonomics matter because Phase 1 will be used to test slow, failed, and repeated local-model calls.
+- The project will be distributed later, so even early prototypes should be cleanly named, reproducible, and free of private/local-only assumptions.
 
 </specifics>
 
