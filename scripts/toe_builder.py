@@ -159,7 +159,7 @@ def encode_text_dat(rows: List[str]) -> bytes:
     buf.extend(struct.pack("<I", 1))            # field 2
     buf.extend(struct.pack("<I", 1))            # field 3
     buf.extend(b"\x02\x00\x00\x03")            # content header (0x03000002 LE)
-    buf.extend(b"\x23")                         # marker byte = '#'
+    buf.extend(b"\x29")                         # content byte 1
     buf.extend(text_bytes)                      # text content
 
     return bytes(buf)
@@ -545,26 +545,7 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
     router = Node(
         name="llm_model_router", optype="COMP", subtype="base",
         x=25, y=25, w=150, h=100,
-        params={
-            "extension1": "op.ext_code.mod.Extension(me)",
-            "extname1": "ModelRouter",
-            "promoteextension1": "on",
-            "iop": "0",
-            "iop0shortcut": "ext_code",
-            "iop0op": "ext_code",
-        },
-        parm_types={
-            "extension1": 256,
-            "extname1": 256,
-            "promoteextension1": 256,
-            "iop": 0,
-            "iop0shortcut": 17,
-            "iop0op": 17,
-        },
         children=[
-            Node(name="ext_code", optype="DAT", subtype="text",
-                 x=25, y=140, w=130, h=90,
-                 text_content="class Extension:\n    def __init__(self, ownerComp):\n        self.ownerComp = ownerComp\nExtension(me)"),
             Node(name="router_http", optype="DAT", subtype="text",
                  x=165, y=140, w=130, h=90,
                  text_content=_read_source("router_http.py")),
@@ -678,44 +659,43 @@ except ImportError:
 
 
 _TEST_RUNNER_SOURCE = '''# me - this DAT
-# Runs on create. Direct execution, no deferral.
+# Runs on create. Tests basic TD access.
 
 def onCreate():
-    msg = ""
-    msg += "=== Model Router Tests ===\\n"
-
+    parts = []
+    parts.append("=== Model Router Tests ===")
+    
     try:
         p = parent()
-        msg += "PASS: parent=" + str(p) + "\\n"
+        parts.append("parent=" + str(p))
     except Exception as e:
-        msg += "FAIL: parent=" + str(e) + "\\n"
+        parts.append("parent FAIL=" + str(e))
 
     try:
         r = p.op("llm_model_router")
-        msg += "PASS: router=" + str(r) + "\\n"
+        parts.append("router=" + str(r))
     except Exception as e:
-        msg += "FAIL: router=" + str(e) + "\\n"
-
-    try:
-        ext = r.ext.ModelRouter
-        s = ext.state
-        msg += "PASS: ext state=" + str(s.get("state", "?")) + "\\n"
-    except Exception as e:
-        msg += "FAIL: ext=" + str(e) + "\\n"
+        parts.append("router FAIL=" + str(e))
 
     try:
         sc = p.op("status_channels")
-        msg += "PASS: status_channels=" + str(sc) + "\\n"
+        parts.append("status_channels=" + str(sc))
     except Exception as e:
-        msg += "FAIL: status_channels=" + str(e) + "\\n"
+        parts.append("status_channels FAIL=" + str(e))
 
-    msg += "=== Tests Complete ===\\n"
+    try:
+        tr = p.op("test_results")
+        parts.append("test_results=" + str(tr))
+    except Exception as e:
+        parts.append("test_results FAIL=" + str(e))
+
+    parts.append("=== Done ===")
+    result = "\\n".join(parts)
     
-    # Write to test_results directly
     try:
         t = p.op("test_results")
         if t:
-            t.text = msg
+            t.text = result
     except:
         pass
 '''
