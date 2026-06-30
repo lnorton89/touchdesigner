@@ -133,35 +133,26 @@ def collapse_toc(toc_path: Path, output_path: Optional[Path] = None) -> None:
 
 
 def encode_text_dat(rows: List[str]) -> bytes:
-    """Encode multi-line text into TD's binary cell format.
+    """Encode multi-line text into TD's .text file format.
 
-    Format (reverse-engineered from TD examples):
-      "2\\n"                          = row count (always 2 in TNFile format)
-      row_length(4 LE)                = total for row header + cell content
-      column_count(4) = 1
-      field1(4) = 1
-      field2(4) = 1
-      field3(4) = 1
-      content_header(4) = 0x03000002  (= 02 00 00 03 in memory)
-      marker(1)                       = varies by content type (0x29 for most scripts)
-      text_content(N)                 = raw UTF-8 text
+    Header (27 bytes fixed):
+      "2\\n" + \\x2a\\x00\\x00\\x00 + col_count(4)=1 + field1(4)=1
+      + field2(4)=1 + field3(4)=1 + content_hdr(4)=\\x02\\x00\\x00\\x03
+      + marker(1)=\\x29
+    Then: raw UTF-8 text content to end of file.
     """
-    text = "\n".join(rows)
-    text_bytes = text.encode("utf-8")
+    text = "\n".join(rows).encode("utf-8")
 
     buf = bytearray()
-    buf.extend(b"2\n")                          # row count
-    row_header_size = 4 + 4 + 4 + 4 + 4 + 4 + 1  # total before text
-    row_total = row_header_size + len(text_bytes)
-    buf.extend(struct.pack("<I", row_total))    # row length
-    buf.extend(struct.pack("<I", 1))            # column count
-    buf.extend(struct.pack("<I", 1))            # field 1
-    buf.extend(struct.pack("<I", 1))            # field 2
-    buf.extend(struct.pack("<I", 1))            # field 3
-    buf.extend(b"\x02\x00\x00\x03")            # content header (0x03000002 LE)
-    buf.extend(b"\x29")                         # content byte 1
-    buf.extend(text_bytes)                      # text content
-
+    buf.extend(b"2\n")                      # row count (fixed)
+    buf.extend(b"\x2a\x00\x00\x00")         # magic constant 42
+    buf.extend(struct.pack("<I", 1))         # column count
+    buf.extend(struct.pack("<I", 1))         # field 1
+    buf.extend(struct.pack("<I", 1))         # field 2
+    buf.extend(struct.pack("<I", 1))         # field 3
+    buf.extend(b"\x02\x00\x00\x03")         # content header
+    buf.extend(b"\x29")                      # marker
+    buf.extend(text)                         # text content
     return bytes(buf)
 
 
@@ -604,7 +595,7 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
         flags="activate on parlanguage 0 viewer 1",
         text_content=_TEST_RUNNER_SOURCE,
         params={
-            "create": "on",
+            "start": "on",
             "language": "python",
             "extension": "languageext",
         },
@@ -614,7 +605,8 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
     # Test results output DAT
     test_results = Node(name="test_results", optype="DAT", subtype="text",
                         x=600, y=250, w=300, h=200,
-                        flags="viewer 1 parlanguage 0")
+                        flags="viewer 1 parlanguage 0",
+                        text_content=" ")  # non-empty so .text file is created
     demo.children.append(test_results)
 
     return builder.build(output_path)
@@ -659,45 +651,45 @@ except ImportError:
 
 
 _TEST_RUNNER_SOURCE = '''# me - this DAT
-# Runs on create. Tests basic TD access.
 
-def onCreate():
-    parts = []
-    parts.append("=== Model Router Tests ===")
-    
+import sys
+sys.path.insert(0, r"C:\\Users\\Lawrence\\Documents\\Dev\\touchdesigner")
+
+def onStart():
+    try:
+        from td_components.mcp_bridge.MCPBridgeExt import MCPBridge
+        debug("bridge: creating MCPBridge")
+        b = MCPBridge(td_op=op, td_run=run)
+        debug("bridge: starting server")
+        b.start()
+        debug("bridge: server started")
+    except Exception as e:
+        debug("bridge: error " + str(e))
     try:
         p = parent()
-        parts.append("parent=" + str(p))
-    except Exception as e:
-        parts.append("parent FAIL=" + str(e))
-
-    try:
-        r = p.op("llm_model_router")
-        parts.append("router=" + str(r))
-    except Exception as e:
-        parts.append("router FAIL=" + str(e))
-
-    try:
-        sc = p.op("status_channels")
-        parts.append("status_channels=" + str(sc))
-    except Exception as e:
-        parts.append("status_channels FAIL=" + str(e))
-
-    try:
-        tr = p.op("test_results")
-        parts.append("test_results=" + str(tr))
-    except Exception as e:
-        parts.append("test_results FAIL=" + str(e))
-
-    parts.append("=== Done ===")
-    result = "\\n".join(parts)
-    
-    try:
         t = p.op("test_results")
         if t:
-            t.text = result
+            t.text = "Bridge started"
     except:
         pass
+
+def onCreate():
+    return
+
+def onExit():
+    return
+
+def onFrameStart(frame):
+    return
+
+def onFrameEnd(frame):
+    return
+
+def onPlayStateChange(state):
+    return
+
+def onDeviceChange():
+    return
 '''
 
 def _read_startup() -> str:

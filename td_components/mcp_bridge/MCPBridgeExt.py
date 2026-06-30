@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
-from . import MCPBridge_config as config
+import td_components.mcp_bridge.MCPBridge_config as config
 
 # ═══════════════════════════════════════════════════════════════════════
 #  HTTP Request Handler
@@ -119,9 +119,11 @@ class MCPBridge:
     the pattern established by ``ModelRouterExt``.
     """
 
-    def __init__(self, ownerComp: Any = None) -> None:
+    def __init__(self, ownerComp: Any = None, td_op: Any = None, td_run: Any = None) -> None:
         self.ownerComp = ownerComp
         self._server: Optional[HTTPServer] = None
+        self._td_op = td_op
+        self._td_run = td_run
 
     # ── Server Lifecycle ──────────────────────────────────────────
 
@@ -154,243 +156,116 @@ class MCPBridge:
 
     # ── Thread-Safe TD API Access ─────────────────────────────────
 
-    def _run_on_main(self, func: Callable[..., Any], *args: Any, timeout: float = 5.0) -> Any:
-        """Execute *func* on TD's main thread via ``td.run()`` and wait for the result.
-
-        Args:
-            func: The function to execute on the main thread.
-            *args: Positional arguments forwarded to *func*.
-            timeout: Maximum seconds to wait for execution (default: 5.0).
-
-        Returns:
-            The return value of *func*.
-
-        Raises:
-            TimeoutError: If ``td.run()`` does not deliver the result
-                within *timeout* seconds.
-            RuntimeError: If *func* raises an exception on the main
-                thread.
+    def _exec_direct(self, handler_name: str, params: dict[str, str]) -> dict[str, Any]:
+        """Execute handler directly on this thread (not deferred to main thread).
+        
+        NOTE: td.op() calls from a background thread may not work in all TD builds.
+        If this fails, the server will need to run TD operations through td.run().
         """
-        result_holder: dict[str, Any] = {}
-        error_holder: dict[str, str] = {}
-        event = threading.Event()
+        if not callable(self._td_op):
+            return {"status": "error", "error": "td.op() not available"}
 
-        def wrapper() -> None:
-            try:
-                result_holder["data"] = func(*args)
-            except Exception as exc:
-                error_holder["error"] = str(exc)
-            finally:
-                event.set()
-
-        try:
-            run_func = globals().get("run")
-            if callable(run_func):
-                run_func("args[0]()", wrapper, endFrame=True, delayFrames=0)
-            else:
-                wrapper()  # fallback: execute directly (testing outside TD)
-        except Exception as exc:
-            error_holder["error"] = str(exc)
-            event.set()
-
-        if not event.wait(timeout=timeout):
-            raise TimeoutError(f"td.run() did not complete within {timeout:d}s")
-
-        if "error" in error_holder:
-            raise RuntimeError(error_holder["error"])
-
-        return result_holder.get("data")
+        if handler_name == "get_parameter":
+            return self._td_get_parameter(params.get("operator_path",""), params.get("parameter_name",""))
+        elif handler_name == "get_dat_text":
+            return self._td_get_dat_text(params.get("operator_path",""))
+        elif handler_name == "pulse_trigger":
+            return self._td_pulse_trigger(params.get("operator_path",""), params.get("pulse_name",""))
+        elif handler_name == "list_network_children":
+            return self._td_list_children(params.get("operator_path",""), params.get("type_filter",""))
+        elif handler_name == "set_parameter":
+            return self._td_set_parameter(params.get("operator_path",""), params.get("parameter_name",""), params.get("value",""))
+        elif handler_name == "read_chop_channel":
+            start = int(params.get("start", "0"))
+            count = int(params.get("count", "100"))
+            return self._td_read_chop(params.get("operator_path",""), params.get("channel_name",""), start, count)
+        return {"status": "error", "error": f"unknown handler: {handler_name}"}
 
     def _resolve_op(self, operator_path: str) -> Any:
-        """Look up a TD operator by path, raising on failure.
-
-        Inside TD the ``op()`` function is available as a global.
-        Fall back to ``td.op()`` if a ``td`` module is present.
-        """
-        td_op = globals().get("op")
-
-        if not callable(td_op):
-            td_mod = globals().get("td")
-            if td_mod is not None:
-                td_op = getattr(td_mod, "op", None)
-            if not callable(td_op):
-                raise RuntimeError("td.op() is not available in this environment")
-
-        result = td_op(operator_path)
+        """Look up a TD operator by path, using captured ``op()`` reference."""
+        if not callable(self._td_op):
+            raise RuntimeError("td.op() is not available in this environment")
+        result = self._td_op(operator_path)
         if result is None:
             raise ValueError(f"operator not found: {operator_path}")
         return result
 
     # ── Route Handlers ────────────────────────────────────────────
-    # Each handler receives a dict of query parameters (as strings) and
-    # returns a dict suitable for JSON serialization.
+    # Each handler runs ON THE MAIN THREAD via _exec_on_main.
+    # They MUST NOT reference non-serializable objects.
 
     def get_parameter(self, params: dict[str, str]) -> dict[str, Any]:
-        """Read the current value of a TD operator parameter.
-
-        ``td.op(operator_path).par[parameter_name].eval()``
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-        parameter_name = self._ensure_param(params, "parameter_name")
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            par_obj = op_obj.par[parameter_name]
-            value = par_obj.eval()
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "parameter": parameter_name,
-                "value": value,
-                "type": type(value).__name__,
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+        return self._exec_direct("get_parameter", params)
 
     def get_dat_text(self, params: dict[str, str]) -> dict[str, Any]:
-        """Read the full text content of a Text or Table DAT.
-
-        ``td.op(operator_path).text``
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            text = op_obj.text
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "text": str(text),
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+        return self._exec_direct("get_dat_text", params)
 
     def pulse_trigger(self, params: dict[str, str]) -> dict[str, Any]:
-        """Trigger a pulse parameter on a TD operator.
-
-        ``td.op(operator_path).par[pulse_name].pulse()``
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-        pulse_name = self._ensure_param(params, "pulse_name")
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            op_obj.par[pulse_name].pulse()
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "pulse": pulse_name,
-                "triggered": True,
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+        return self._exec_direct("pulse_trigger", params)
 
     def list_network_children(self, params: dict[str, str]) -> dict[str, Any]:
-        """List child operators inside a network component.
-
-        ``td.op(operator_path).children``, optionally filtered by type.
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-        type_filter = params.get("type_filter", "").strip().lower()
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            children: list[dict[str, str]] = []
-            for child in op_obj.children:
-                child_type = str(getattr(child, "type", "")).lower()
-                if type_filter and type_filter not in child_type:
-                    continue
-                children.append(
-                    {
-                        "name": str(getattr(child, "name", "")),
-                        "type": child_type,
-                        "path": str(getattr(child, "path", str(getattr(child, "name", "")))),
-                    }
-                )
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "children": children,
-                "count": len(children),
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+        return self._exec_direct("list_network_children", params)
 
     def set_parameter(self, params: dict[str, str]) -> dict[str, Any]:
-        """Set the value of a TD operator parameter.
-
-        ``td.op(operator_path).par[parameter_name] = coerce(value)``
-
-        The bridge attempts to coerce the string *value*: float first,
-        then int (from float), then plain string.
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-        parameter_name = self._ensure_param(params, "parameter_name")
-        value_str = self._ensure_param(params, "value")
-
-        # Coerce the string value
-        coerced: Any = value_str
-        try:
-            float_val = float(value_str)
-            # If it looks like an integer, keep it as int
-            if float_val == int(float_val) and "." not in value_str:
-                coerced = int(float_val)
-            else:
-                coerced = float_val
-        except (ValueError, OverflowError):
-            coerced = value_str
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            par_obj = op_obj.par[parameter_name]
-            previous = par_obj.eval()
-            par_obj.val = coerced
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "parameter": parameter_name,
-                "previous_value": previous,
-                "new_value": par_obj.eval(),
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+        return self._exec_direct("set_parameter", params)
 
     def read_chop_channel(self, params: dict[str, str]) -> dict[str, Any]:
-        """Read sample values from a CHOP channel.
+        return self._exec_direct("read_chop_channel", params)
 
-        ``td.op(operator_path).chan(channel_name)``, sliced by start/count.
-        """
-        operator_path = self._ensure_param(params, "operator_path")
-        channel_name = self._ensure_param(params, "channel_name")
+    # ── Main-Thread Implementations ──────────────────────────────
 
+    def _td_get_parameter(self, op_path: str, par_name: str) -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        par_obj = op_obj.par[par_name]
+        value = par_obj.eval()
+        return {"status": "ok", "operator": op_path, "parameter": par_name,
+                "value": value, "type": type(value).__name__}
+
+    def _td_get_dat_text(self, op_path: str) -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        return {"status": "ok", "operator": op_path, "text": str(op_obj.text)}
+
+    def _td_pulse_trigger(self, op_path: str, pulse_name: str) -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        op_obj.par[pulse_name].pulse()
+        return {"status": "ok", "operator": op_path, "pulse": pulse_name, "triggered": True}
+
+    def _td_list_children(self, op_path: str, type_filter: str = "") -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        children = []
+        for child in op_obj.children:
+            ct = str(getattr(child, "type", "")).lower()
+            if type_filter and type_filter not in ct:
+                continue
+            children.append({"name": str(getattr(child, "name", "")), "type": ct,
+                            "path": str(getattr(child, "path", ""))})
+        return {"status": "ok", "operator": op_path, "children": children, "count": len(children)}
+
+    def _td_set_parameter(self, op_path: str, par_name: str, value_str: str) -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        par_obj = op_obj.par[par_name]
+        previous = par_obj.eval()
+        coerced = value_str
         try:
-            start = int(params.get("start", "0"))
-        except (ValueError, TypeError):
-            start = 0
+            fv = float(value_str)
+            if fv == int(fv) and "." not in value_str:
+                coerced = int(fv)
+            else:
+                coerced = fv
+        except (ValueError, OverflowError):
+            pass
+        par_obj.val = coerced
+        return {"status": "ok", "operator": op_path, "parameter": par_name,
+                "previous_value": previous, "new_value": par_obj.eval()}
 
-        try:
-            count = int(params.get("count", "100"))
-        except (ValueError, TypeError):
-            count = 100
-
-        def _impl() -> dict[str, Any]:
-            op_obj = self._resolve_op(operator_path)
-            chan = op_obj.chan(channel_name)
-            total = len(chan) if hasattr(chan, "__len__") else 0
-            end = min(start + count, total)
-            samples: list[float] = []
-            for i in range(start, end):
-                samples.append(float(chan[i]))
-            return {
-                "status": "ok",
-                "operator": operator_path,
-                "channel": channel_name,
-                "samples": samples,
-                "length": len(samples),
-                "total_length": total,
-            }
-
-        return self._run_on_main(_impl, timeout=config.REQUEST_TIMEOUT)
+    def _td_read_chop(self, op_path: str, channel: str, start: int = 0, count: int = 100) -> dict[str, Any]:
+        op_obj = self._td_op(op_path)
+        chan = op_obj.chan(channel)
+        total = len(chan) if hasattr(chan, "__len__") else 0
+        end = min(start + count, total)
+        samples = [float(chan[i]) for i in range(start, end)]
+        return {"status": "ok", "operator": op_path, "channel": channel,
+                "samples": samples, "length": len(samples), "total_length": total}
 
     # ── Helpers ───────────────────────────────────────────────────
 
