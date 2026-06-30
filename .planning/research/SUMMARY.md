@@ -8,12 +8,16 @@ TouchDesigner Base COMP `.tox` components with Python extension classes, an exte
 
 - Reusable `.tox` operator family.
 - Model Router with provider/base URL/model/API-key configuration.
+- Central Router request function used by future LLM operators.
+- Callback operator/function target for async result delivery.
 - Agent with prompt/message inputs, history, response DAT output, and CHOP trigger/status output.
 - Nonblocking request execution with TD-safe result delivery.
 - Tool declaration/discovery convention.
 - One working TD-native tool-call round trip.
 - Local Ollama/OpenAI-compatible endpoint support.
 - Dependency bootstrap/status flow for external venv loading.
+- Phase 1 demo triggerable from both a parameter pulse and DAT/table update.
+- Reset/retry controls for repeatable testing.
 
 ## Watch Out For
 
@@ -26,3 +30,5 @@ TouchDesigner Base COMP `.tox` components with Python extension classes, an exte
 ## Roadmap Implications
 
 Phase 1 should prove the async Router against local Ollama before building a broad provider abstraction. Phase 2 should add Agent history and output conventions. Phase 3 should add tool discovery and one real TD tool. Phase 4 should package and harden the `.tox` plus dependency installer. Later phases can add structured output, RAG, and voice.
+
+Video feature extraction from https://www.youtube.com/watch?v=Go1EfndMfNY reinforces that the first Router should behave like the central `chat TD` gateway: one callable API surface, explicit callback handoff, and TD-native trigger/reset ergonomics.

@@ -10,6 +10,8 @@
 - [ ] **ROUT-01**: User can configure a Model Router COMP with provider type, base URL, model name, timeout, and API key source.
 - [ ] **ROUT-02**: User can send a prompt through the Router to a local Ollama or OpenAI-compatible endpoint and receive plain-text output in a DAT.
 - [ ] **ROUT-03**: User can see request lifecycle state from the Router, including idle, running, complete, and error.
+- [ ] **ROUT-05**: User can call one central Router request function from future LLM operators instead of duplicating provider-call logic.
+- [ ] **ROUT-06**: User can configure an optional callback operator/function target that receives async request results.
 - [ ] **ROUT-04**: User can keep API keys out of saved `.toe` and `.tox` files by referencing local environment or settings sources.
 
 ### Runtime
@@ -44,6 +46,8 @@
 ### Examples
 
 - [ ] **EXMP-01**: User can run a demo that sends a DAT message to a local Ollama model and receives a response DAT.
+- [ ] **EXMP-03**: User can run a Phase 1 demo from either a parameter pulse or a DAT/table-change trigger.
+- [ ] **EXMP-04**: User can reset or retry the demo request state without rebuilding the network.
 - [ ] **EXMP-02**: User can run a demo tool that reads or sets a CHOP value through an Agent tool call.
 
 ## v2 Requirements
@@ -87,6 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROUT-01 | Phase 1 | Pending |
 | ROUT-02 | Phase 1 | Pending |
 | ROUT-03 | Phase 1 | Pending |
+| ROUT-05 | Phase 1 | Pending |
+| ROUT-06 | Phase 1 | Pending |
 | ROUT-04 | Phase 4 | Pending |
 | RUNT-01 | Phase 1 | Pending |
 | RUNT-02 | Phase 1 | Pending |
@@ -106,13 +112,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PACK-03 | Phase 4 | Pending |
 | PACK-04 | Phase 4 | Pending |
 | EXMP-01 | Phase 1 | Pending |
+| EXMP-03 | Phase 1 | Pending |
+| EXMP-04 | Phase 1 | Pending |
 | EXMP-02 | Phase 3 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
+- v1 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-30*
-*Last updated: 2026-06-30 after roadmap creation*
+*Last updated: 2026-06-30 after video feature extraction*

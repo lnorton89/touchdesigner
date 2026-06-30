@@ -10,7 +10,7 @@ This roadmap prioritizes the riskiest technical proof first: a nonblocking local
 
 | Phase | Name | Goal | Requirements |
 |-------|------|------|--------------|
-| 1 | Async Router Proof | Prove nonblocking local model calls from TD into DAT/CHOP outputs | ROUT-01, ROUT-02, ROUT-03, RUNT-01, RUNT-02, RUNT-03, EXMP-01 |
+| 1 | Async Router Proof | Prove nonblocking local model calls from TD into DAT/CHOP outputs | ROUT-01, ROUT-02, ROUT-03, ROUT-05, ROUT-06, RUNT-01, RUNT-02, RUNT-03, EXMP-01, EXMP-03, EXMP-04 |
 | 2 | Agent Conversation Loop | Add prompt/history behavior and Agent-native outputs | AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05 |
 | 3 | TD Tool Calling | Prove model-requested TD-native tool execution | TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, EXMP-02 |
 | 4 | Packaging and Dependency Bootstrap | Package the working family as a reusable `.tox` with external dependency loading and secret hygiene | ROUT-04, PACK-01, PACK-02, PACK-03, PACK-04 |
@@ -21,14 +21,17 @@ This roadmap prioritizes the riskiest technical proof first: a nonblocking local
 
 **Goal:** A TD project can send a prompt to local Ollama or a generic OpenAI-compatible endpoint without blocking the frame loop, then receive output back in DAT/CHOP form.
 **Mode:** mvp
-**Requirements:** ROUT-01, ROUT-02, ROUT-03, RUNT-01, RUNT-02, RUNT-03, EXMP-01
+**Requirements:** ROUT-01, ROUT-02, ROUT-03, ROUT-05, ROUT-06, RUNT-01, RUNT-02, RUNT-03, EXMP-01, EXMP-03, EXMP-04
 
 **Success Criteria:**
 1. A Model Router COMP exposes provider, base URL, model, timeout, and API key source parameters.
 2. A local Ollama prompt can be triggered from TD and returns plain text into a DAT.
 3. Router status visibly transitions through idle, running, complete, and error states.
 4. A deliberately slow or failed request does not freeze TouchDesigner's main thread.
-5. The included demo sends a DAT message and receives a response DAT.
+5. Future LLM operators can call a single central Router request function.
+6. Async results can be delivered through a configured callback operator/function target.
+7. The included demo can be triggered by both a parameter pulse and a DAT/table update.
+8. Reset/retry controls make slow, failed, and repeated request cases easy to test.
 
 ### Phase 2: Agent Conversation Loop
 
@@ -76,6 +79,8 @@ This roadmap prioritizes the riskiest technical proof first: a nonblocking local
 | ROUT-01 | Phase 1 | Pending |
 | ROUT-02 | Phase 1 | Pending |
 | ROUT-03 | Phase 1 | Pending |
+| ROUT-05 | Phase 1 | Pending |
+| ROUT-06 | Phase 1 | Pending |
 | ROUT-04 | Phase 4 | Pending |
 | RUNT-01 | Phase 1 | Pending |
 | RUNT-02 | Phase 1 | Pending |
@@ -95,6 +100,8 @@ This roadmap prioritizes the riskiest technical proof first: a nonblocking local
 | PACK-03 | Phase 4 | Pending |
 | PACK-04 | Phase 4 | Pending |
 | EXMP-01 | Phase 1 | Pending |
+| EXMP-03 | Phase 1 | Pending |
+| EXMP-04 | Phase 1 | Pending |
 | EXMP-02 | Phase 3 | Pending |
 
-**Coverage:** 23 of 23 v1 requirements mapped.
+**Coverage:** 27 of 27 v1 requirements mapped.

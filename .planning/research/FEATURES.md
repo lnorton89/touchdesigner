@@ -15,6 +15,10 @@
 - Surface request lifecycle state: idle, running, complete, error.
 - Write final response to DAT output and emit CHOP trigger/counter channels.
 - Capture errors as data, not crashes.
+- Expose a single central Router request function that future LLM operators can call.
+- Allow async results to be routed through a callback operator/function target.
+- Support a DAT/table-change trigger path in the first proof, not only a parameter pulse.
+- Include reset/retry controls for repeatable slow/error request testing.
 
 ### Agent
 
@@ -44,6 +48,10 @@
 - STT/TTS operators for voice-driven TD networks.
 - Model capability probe for local models, especially tool-call support quality.
 - Optional Engine COMP process isolation experiments for heavy work.
+- Hold-chat behavior based on message count or token threshold.
+- GLSL repair loop that feeds compile errors back to an Agent.
+- TOP captioning through multimodal models.
+- Parameter-control demos for poster/design or art-playback workflows.
 
 ## Sources
 
