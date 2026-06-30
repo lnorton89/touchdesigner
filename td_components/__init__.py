@@ -1,0 +1,1 @@
+"""TouchDesigner component source package."""
