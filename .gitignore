@@ -8,6 +8,7 @@ venv/
 # TouchDesigner export artifacts
 *.tox
 *.toe
+!demo/demo.toe
 
 # OS metadata
 .DS_Store
