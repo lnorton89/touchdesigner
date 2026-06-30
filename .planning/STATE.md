@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: uat_pending
 stopped_at: Phase 1 demo.toe now opens, UAT can proceed
-last_updated: "2026-06-30T07:52:09.000Z"
+last_updated: "2026-06-30T08:50:00.000Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -49,6 +49,7 @@ Phase 1 implementation plans are complete. demo.toe now opens in TD (was hanging
 | 250629-001 | Add llama.cpp provider support with default endpoint and launcher script | 2026-06-29 | c5142e9 | [250629-001-llama-cpp-provider](./quick/250629-001-llama-cpp-provider/) |
 | 250630-001 | Fix demo.toe hang — trailing \n, LF-only, empty .text, TOC ordering | 2026-06-30 | — | [toe_builder.py](./scripts/toe_builder.py) |
 | 260630-137 | MCP server feasibility research and sketch — confirmed SDK compat, recommended companion process | 2026-06-30 | de8b513, 9d2bb71 | [260630-137-look-into-creating-an-mcp-server-for-tou](./quick/260630-137-look-into-creating-an-mcp-server-for-tou/) |
+| 260630-2fy | Implement production MCP server: companion FastMCP server, TD-side bridge extension, updated deps | 2026-06-30 | ab640ac, fe3b4c4, 53713e4 | [260630-2fy-implement-production-mcp-server-for-touc](./quick/260630-2fy-implement-production-mcp-server-for-touc/) |
 
 ### Discovered .toe Format Constraints
 
@@ -63,5 +64,5 @@ These were learned through debugging the demo.toe hang and are now captured in A
 ## Session
 
 **Last session:** 2026-06-30T07:52:09.000Z
-**Stopped at:** Completed MCP server feasibility research and sketch (260630-137). Next: Phase 1 UAT or Phase 2 Agent.
-**Resume file:** .planning/quick/260630-137-look-into-creating-an-mcp-server-for-tou/260630-137-SUMMARY.md
+**Stopped at:** Completed production MCP server implementation (260630-2fy): companion FastMCP server + TD-side bridge extension. Next: Phase 1 UAT or Phase 2 Agent.
+**Resume file:** .planning/quick/260630-2fy-implement-production-mcp-server-for-touc/260630-2fy-SUMMARY.md
