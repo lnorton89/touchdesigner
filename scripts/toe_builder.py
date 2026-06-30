@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import datetime
 import os
 import shutil
 import struct
@@ -362,6 +363,17 @@ class ToeBuilder:
 
         # Copy template files to work dir
         shutil.copytree(template_dir, self._expanded_dir, symlinks=True)
+
+        # Update .build file to match installed TD version
+        build_path = self._expanded_dir / ".build"
+        now = datetime.datetime.now()
+        build_path.write_bytes(
+            f"version 099\n"
+            f"build {TOUCHDESIGNER_BUILD}\n"
+            f"time {now.strftime('%a %b %d %H:%M:%S %Y')}\n"
+            f"osname Windows\n"
+            f"osversion 10\n".encode("ascii")
+        )
 
         # Clean existing operators from project directory, then write our nodes
         project_dir = self._expanded_dir / self._project_dir_name
