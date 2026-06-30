@@ -27,7 +27,8 @@ def check_import(name: str, min_version: str | None = None) -> dict:
 def main() -> int:
     checks = [
         ("httpx", "0.27"),
-        ("pydantic", "2.5"),
+        ("pydantic", "2.11"),
+        ("mcp", "1.27"),
     ]
 
     results = []
