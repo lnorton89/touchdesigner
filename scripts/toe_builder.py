@@ -40,19 +40,15 @@ def _find_toe_bin() -> Optional[Path]:
 
 
 def _find_template_toe() -> Optional[Path]:
-    """Find or create a minimal template .toe file."""
+    """Find a minimal template .toe file.
+
+    Always uses the system-provided blank project from Samples to ensure
+    a clean, unmodified base.
+    """
     td_bin = _find_toe_bin()
     if not td_bin:
         return None
 
-    # Use a previously-saved project as template (has correct subdirectory structure)
-    for candidate in [
-        Path.home() / "Documents" / "Derivative" / "Projects" / "NewProject.toe",
-    ]:
-        if candidate.is_file():
-            return candidate
-
-    # Fall back to system templates (may not have project1/ subdirectory structure)
     for candidate in [
         td_bin.parent / "Samples" / "Setup" / "Base" / "NewProject.toe",
         td_bin.parent / "Samples" / "Learn" / "PythonExamples.toe",
