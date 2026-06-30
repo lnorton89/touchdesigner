@@ -84,35 +84,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROUT-01 | Pending | Pending |
-| ROUT-02 | Pending | Pending |
-| ROUT-03 | Pending | Pending |
-| ROUT-04 | Pending | Pending |
-| RUNT-01 | Pending | Pending |
-| RUNT-02 | Pending | Pending |
-| RUNT-03 | Pending | Pending |
-| AGNT-01 | Pending | Pending |
-| AGNT-02 | Pending | Pending |
-| AGNT-03 | Pending | Pending |
-| AGNT-04 | Pending | Pending |
-| AGNT-05 | Pending | Pending |
-| TOOL-01 | Pending | Pending |
-| TOOL-02 | Pending | Pending |
-| TOOL-03 | Pending | Pending |
-| TOOL-04 | Pending | Pending |
-| TOOL-05 | Pending | Pending |
-| PACK-01 | Pending | Pending |
-| PACK-02 | Pending | Pending |
-| PACK-03 | Pending | Pending |
-| PACK-04 | Pending | Pending |
-| EXMP-01 | Pending | Pending |
-| EXMP-02 | Pending | Pending |
+| ROUT-01 | Phase 1 | Pending |
+| ROUT-02 | Phase 1 | Pending |
+| ROUT-03 | Phase 1 | Pending |
+| ROUT-04 | Phase 4 | Pending |
+| RUNT-01 | Phase 1 | Pending |
+| RUNT-02 | Phase 1 | Pending |
+| RUNT-03 | Phase 1 | Pending |
+| AGNT-01 | Phase 2 | Pending |
+| AGNT-02 | Phase 2 | Pending |
+| AGNT-03 | Phase 2 | Pending |
+| AGNT-04 | Phase 2 | Pending |
+| AGNT-05 | Phase 2 | Pending |
+| TOOL-01 | Phase 3 | Pending |
+| TOOL-02 | Phase 3 | Pending |
+| TOOL-03 | Phase 3 | Pending |
+| TOOL-04 | Phase 3 | Pending |
+| TOOL-05 | Phase 3 | Pending |
+| PACK-01 | Phase 4 | Pending |
+| PACK-02 | Phase 4 | Pending |
+| PACK-03 | Phase 4 | Pending |
+| PACK-04 | Phase 4 | Pending |
+| EXMP-01 | Phase 1 | Pending |
+| EXMP-02 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-30*
-*Last updated: 2026-06-30 after initial definition*
+*Last updated: 2026-06-30 after roadmap creation*
