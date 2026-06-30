@@ -15,6 +15,23 @@ class FakeResponse:
 
 
 class RouterHttpTests(unittest.TestCase):
+    def test_llamacpp_is_valid_provider(self):
+        envelope = router_http.build_request_envelope(
+            provider="llama.cpp", prompt="hello"
+        )
+        self.assertEqual(envelope["provider"], "llama.cpp")
+        self.assertEqual(envelope["base_url"], router_http.LLAMACPP_BASE_URL.rstrip("/"))
+
+    def test_llamacpp_base_url_defaults_to_8080(self):
+        envelope = router_http.build_request_envelope(
+            provider="llama.cpp", prompt="test"
+        )
+        self.assertIn("127.0.0.1:8080", envelope["base_url"])
+
+    def test_unsupported_provider_raises_error(self):
+        with self.assertRaises(router_http.RouterConfigError):
+            router_http.build_request_envelope(provider="invalid_provider", prompt="x")
+
     def test_openai_compatible_response_extracts_text(self):
         envelope = router_http.build_request_envelope(prompt="hello")
         payload = {"choices": [{"message": {"content": "world"}}]}

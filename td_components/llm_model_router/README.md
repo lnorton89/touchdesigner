@@ -14,8 +14,8 @@ Use a COMP named `llm_model_router` with a source-exported extension class named
 
 Custom parameter names are stable for later `.tox` packaging:
 
-- `Provider`: default `openai_compatible`
-- `Baseurl`: default `http://localhost:11434/v1`
+- `Provider`: one of `openai_compatible`, `ollama`, or `llama.cpp` (default: `openai_compatible`)
+- `Baseurl`: default `http://localhost:11434/v1` (or `http://127.0.0.1:8080/v1` when Provider is `llama.cpp`)
 - `Model`: default `llama3.2`
 - `Timeout`: default `30`
 - `Promptdat`: optional DAT prompt source
@@ -32,6 +32,27 @@ Both parameter pulse and DAT/table-change triggers call the same central `ModelR
 Worker code receives only plain dictionaries and returns plain dictionaries. DAT/CHOP-style output updates and callback invocation belong to the Router extension handoff path, not the HTTP adapter.
 
 Status snapshots expose DAT/CHOP-ready values: `running`, `done`, `error`, `request_id`, `complete_count`, `error_count`, and `retry_count`. Reset clears runtime status, response text, error text, and counters while preserving the configured provider, endpoint, model, prompt DAT reference, and callback target.
+
+## llama.cpp Provider
+
+The `llama.cpp` provider connects to a local llama.cpp server via the OpenAI-compatible
+endpoint at `http://127.0.0.1:8080/v1`. Start the server before sending requests:
+
+```powershell
+.\scripts\start-llama-server.ps1
+```
+
+This delegates to the companion llama project's profile-based launcher. See
+`documents/dev/llama` for model management, hardware profiles, and tuning.
+
+Use the interactive wrapper to select profiles:
+
+```powershell
+.\scripts\start-llama-server.ps1 -Profile moe-balanced
+```
+
+The server must be started and stopped independently. The Model Router connects
+to the running server — it does not manage the server lifecycle.
 
 ## Distribution Notes
 

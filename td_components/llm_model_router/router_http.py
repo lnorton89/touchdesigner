@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 DEFAULT_PROVIDER = "openai_compatible"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
+LLAMACPP_BASE_URL = "http://127.0.0.1:8080/v1"
 DEFAULT_MODEL = "llama3.2"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 300.0
@@ -70,7 +71,7 @@ def _normalize_messages(
 def build_request_envelope(
     *,
     provider: str = DEFAULT_PROVIDER,
-    base_url: str = DEFAULT_BASE_URL,
+    base_url: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     timeout: Any = DEFAULT_TIMEOUT_SECONDS,
     prompt: Optional[str] = None,
@@ -82,15 +83,17 @@ def build_request_envelope(
     request_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     provider_name = str(provider or DEFAULT_PROVIDER).strip()
-    if provider_name not in {"openai_compatible", "ollama"}:
+    if provider_name not in {"openai_compatible", "ollama", "llama.cpp"}:
         raise RouterConfigError(f"unsupported provider: {provider_name}")
+
+    resolved_base_url = LLAMACPP_BASE_URL if provider_name == "llama.cpp" else DEFAULT_BASE_URL
 
     request_id_value = int(request_id if request_id is not None else next_request_id())
     now = time.time()
     return {
         "request_id": request_id_value,
         "provider": provider_name,
-        "base_url": _validate_base_url(str(base_url or DEFAULT_BASE_URL).strip()),
+        "base_url": _validate_base_url(str(base_url or resolved_base_url).strip()),
         "model": str(model or DEFAULT_MODEL).strip(),
         "timeout": _coerce_timeout(timeout),
         "messages": _normalize_messages(prompt=prompt, messages=messages),
@@ -237,7 +240,7 @@ def rebuild_retry_envelope(
 ) -> Dict[str, Any]:
     return build_request_envelope(
         provider=str(last_envelope.get("provider", DEFAULT_PROVIDER)),
-        base_url=str(last_envelope.get("base_url", DEFAULT_BASE_URL)),
+        base_url=last_envelope.get("base_url", None),
         model=str(last_envelope.get("model", DEFAULT_MODEL)),
         timeout=last_envelope.get("timeout", DEFAULT_TIMEOUT_SECONDS),
         messages=last_envelope.get("messages", []),
