@@ -4,6 +4,15 @@ from td_components.llm_model_router import router_http
 from td_components.llm_model_router.ModelRouterExt import ModelRouter
 
 
+class FakeResponse:
+    def __init__(self, status, text):
+        self.status = status
+        self._text = text
+
+    def read(self):
+        return self._text.encode("utf-8")
+
+
 class RouterHttpTests(unittest.TestCase):
     def test_openai_compatible_response_extracts_text(self):
         envelope = router_http.build_request_envelope(prompt="hello")
@@ -68,12 +77,45 @@ class RouterHttpTests(unittest.TestCase):
         self.assertGreater(retry["request_id"], first["request_id"])
         self.assertEqual(retry["trigger_source"], "retry")
 
+    def test_call_openai_compatible_posts_chat_completion(self):
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request, timeout))
+            return FakeResponse(200, '{"choices":[{"message":{"content":"ok"}}]}')
+
+        envelope = router_http.build_request_envelope(
+            prompt="hello",
+            base_url="http://localhost:11434/v1",
+            model="demo-model",
+            timeout=12,
+        )
+
+        result = router_http.call_openai_compatible(envelope, opener=opener)
+
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["response_text"], "ok")
+        self.assertEqual(result["base_url"], "http://localhost:11434/v1")
+        self.assertEqual(result["model"], "demo-model")
+        self.assertEqual(calls[0][0].full_url, "http://localhost:11434/v1/chat/completions")
+        self.assertEqual(calls[0][1], 12)
+
+    def test_call_openai_compatible_malformed_json_is_error(self):
+        envelope = router_http.build_request_envelope(prompt="hello")
+
+        result = router_http.call_openai_compatible(
+            envelope, opener=lambda request, timeout: FakeResponse(200, "not json")
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error_kind"], "malformed_json")
+
 
 class ModelRouterTests(unittest.TestCase):
     def test_request_is_central_entry_point_and_marks_running(self):
         router = ModelRouter()
 
-        request_id = router.request(prompt="hello", trigger_source="pulse")
+        request_id = router.request(prompt="hello", trigger_source="pulse", dispatch=False)
 
         self.assertGreater(request_id, 0)
         self.assertTrue(router.state["running"])
@@ -101,7 +143,7 @@ class ModelRouterTests(unittest.TestCase):
         router = ModelRouter()
 
         self.assertEqual(router.state["state"], "idle")
-        request_id = router.request(prompt="hello")
+        request_id = router.request(prompt="hello", dispatch=False)
         router.apply_result(
             {
                 "request_id": request_id,
@@ -119,15 +161,62 @@ class ModelRouterTests(unittest.TestCase):
 
     def test_reset_clears_runtime_state_but_retry_preserves_last_request(self):
         router = ModelRouter()
-        first_id = router.request(prompt="hello", trigger_source="dat_change")
+        first_id = router.request(prompt="hello", trigger_source="dat_change", dispatch=False)
 
         reset_state = router.reset()
-        retry_id = router.retry()
+        retry_id = router.retry(dispatch=False)
 
         self.assertEqual(reset_state["state"], "idle")
         self.assertGreater(retry_id, first_id)
         self.assertEqual(router.state["state"], "running")
         self.assertEqual(router._last_envelope["trigger_source"], "retry")
+
+    def test_apply_result_owns_callback_payload_and_output_state(self):
+        class CallbackTarget:
+            def __init__(self):
+                self.payloads = []
+
+            def onRouterResult(self, payload):
+                self.payloads.append(payload)
+
+        target = CallbackTarget()
+        router = ModelRouter()
+        router._last_envelope = {
+            "callback_target": target,
+            "callback_method": "onRouterResult",
+        }
+        router._active_request_id = 10
+
+        router._apply_result(
+            {
+                "request_id": 10,
+                "status": "complete",
+                "response_text": "done",
+                "error_text": "",
+                "elapsed_ms": 5,
+                "trigger_source": "pulse",
+            }
+        )
+
+        self.assertEqual(router.state["response_text"], "done")
+        self.assertEqual(router.state["status_channels"]["done"], 1)
+        self.assertEqual(target.payloads[0]["request_id"], 10)
+
+    def test_stale_result_is_ignored(self):
+        router = ModelRouter()
+        newer_id = router.request(prompt="new", dispatch=False)
+
+        router._apply_result(
+            {
+                "request_id": newer_id - 1,
+                "status": "complete",
+                "response_text": "old",
+                "error_text": "",
+            }
+        )
+
+        self.assertEqual(router.state["state"], "running")
+        self.assertEqual(router.state["response_text"], "")
 
 
 if __name__ == "__main__":

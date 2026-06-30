@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Dict, Mapping, Optional
 
 try:
@@ -47,14 +48,18 @@ class ModelRouter:
         self._active_request_id: Optional[int] = None
         self._last_envelope: Optional[Dict[str, Any]] = None
         self._last_result: Optional[Dict[str, Any]] = None
+        self._response_text = ""
+        self._error_text = ""
         self._complete_count = 0
         self._error_count = 0
+        self._status_channels = self._build_status_channels()
 
     def request(
         self,
         prompt: Optional[str] = None,
         messages: Optional[list[Mapping[str, Any]]] = None,
         trigger_source: str = "pulse",
+        dispatch: bool = True,
     ) -> int:
         config = self._read_config()
         if prompt is None and messages is None:
@@ -74,33 +79,75 @@ class ModelRouter:
         )
         self._mark_running(envelope)
         self._write_outputs()
+        if dispatch:
+            self._submit_worker(envelope)
         return int(envelope["request_id"])
 
     def reset(self) -> Dict[str, Any]:
         self._state = "idle"
         self._active_request_id = None
         self._last_result = None
+        self._response_text = ""
+        self._error_text = ""
+        self._status_channels = self._build_status_channels()
         self._write_outputs()
         return self._snapshot_state()
 
-    def retry(self) -> int:
+    def retry(self, dispatch: bool = True) -> int:
         if not self._last_envelope:
             raise RuntimeError("no previous request to retry")
         envelope = router_http.rebuild_retry_envelope(self._last_envelope)
         self._mark_running(envelope)
         self._write_outputs()
+        if dispatch:
+            self._submit_worker(envelope)
         return int(envelope["request_id"])
 
     def apply_result(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
+        return self._apply_result(payload)
+
+    def _apply_result(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
+        request_id = int(payload.get("request_id", 0) or 0)
+        if self._active_request_id and request_id < self._active_request_id:
+            return self._snapshot_state()
+
         self._last_result = dict(payload)
-        self._active_request_id = int(payload.get("request_id", 0) or 0)
+        self._active_request_id = request_id
         self._state = str(payload.get("status", "error"))
+        self._response_text = str(payload.get("response_text", ""))
+        self._error_text = str(payload.get("error_text", ""))
         if self._state == "complete":
             self._complete_count += 1
         elif self._state == "error":
             self._error_count += 1
+        self._status_channels = self._build_status_channels()
         self._write_outputs()
+        self._invoke_callback(payload)
         return self._snapshot_state()
+
+    def _submit_worker(self, envelope: Mapping[str, Any]) -> None:
+        plain_envelope = dict(envelope)
+
+        def worker() -> None:
+            payload = router_http.call_openai_compatible(plain_envelope)
+            self._handoff_result(payload)
+
+        thread = threading.Thread(
+            target=worker,
+            name=f"ModelRouter-{plain_envelope.get('request_id', 'request')}",
+            daemon=True,
+        )
+        thread.start()
+
+    def _handoff_result(self, payload: Mapping[str, Any]) -> None:
+        run_func = globals().get("run")
+        if callable(run_func) and self.ownerComp is not None:
+            try:
+                run_func("args[0]._apply_result(args[1])", self, dict(payload), endFrame=True)
+                return
+            except Exception:
+                pass
+        self._apply_result(payload)
 
     def _read_config(self) -> Dict[str, Any]:
         return {
@@ -137,6 +184,9 @@ class ModelRouter:
         self._active_request_id = int(envelope["request_id"])
         self._last_envelope = dict(envelope)
         self._last_result = None
+        self._response_text = ""
+        self._error_text = ""
+        self._status_channels = self._build_status_channels()
 
     def _snapshot_state(self) -> Dict[str, Any]:
         return {
@@ -147,11 +197,42 @@ class ModelRouter:
             "request_id": self._active_request_id or 0,
             "complete_count": self._complete_count,
             "error_count": self._error_count,
+            "response_text": self._response_text,
+            "error_text": self._error_text,
+            "status_channels": dict(self._status_channels),
             "last_result": dict(self._last_result) if self._last_result else None,
+        }
+
+    def _build_status_channels(self) -> Dict[str, int]:
+        request_id = int(self._active_request_id or 0)
+        return {
+            "running": int(self._state == "running"),
+            "done": int(self._state == "complete"),
+            "error": int(self._state == "error"),
+            "request_id": request_id,
+            "complete_count": self._complete_count,
+            "error_count": self._error_count,
         }
 
     def _write_outputs(self) -> None:
         """Plan 02 writes DAT/CHOP outputs on the TouchDesigner side."""
+
+    def _invoke_callback(self, payload: Mapping[str, Any]) -> None:
+        envelope = self._last_envelope or {}
+        target_ref = envelope.get("callback_target")
+        if not target_ref:
+            return
+
+        method_name = str(envelope.get("callback_method", "onRouterResult"))
+        target = target_ref
+        if isinstance(target_ref, str) and self.ownerComp is not None:
+            op_lookup = getattr(self.ownerComp, "op", None)
+            if callable(op_lookup):
+                target = op_lookup(target_ref)
+
+        callback = getattr(target, method_name, None)
+        if callable(callback):
+            callback(dict(payload))
 
     @property
     def state(self) -> Dict[str, Any]:

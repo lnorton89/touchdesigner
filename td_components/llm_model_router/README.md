@@ -6,6 +6,7 @@ Phase 1 targets the newest TouchDesigner build installed on this system:
 - Install path: `C:\Program Files\Derivative\TouchDesigner.2022.25370`
 - Embedded Python observed from installed DLLs: Python `3.9`
 - Thread Manager status: not assumed by this scaffold; the worker plan must support a raw Python thread plus TD-side handoff fallback until this is confirmed inside TouchDesigner.
+- HTTP dependency decision: Phase 1 uses Python stdlib `urllib.request`; `httpx` adoption is deferred until dependency hardening/package verification.
 
 ## Component Contract
 
@@ -27,6 +28,8 @@ Custom parameter names are stable for later `.tox` packaging:
 - `Statusdisplay`: optional display target
 
 Both parameter pulse and DAT/table-change triggers call the same central `ModelRouter.request(...)` API. Reset and retry call `ModelRouter.reset()` and `ModelRouter.retry()` respectively.
+
+Worker code receives only plain dictionaries and returns plain dictionaries. DAT/CHOP-style output updates and callback invocation belong to the Router extension handoff path, not the HTTP adapter.
 
 ## Distribution Notes
 

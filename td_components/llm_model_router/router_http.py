@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import itertools
+import json
 import time
 from typing import Any, Dict, Iterable, List, Mapping, Optional
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urlparse
 
 
@@ -133,6 +136,9 @@ def success_payload(
         "error_text": "",
         "elapsed_ms": elapsed_ms,
         "trigger_source": envelope.get("trigger_source", "unknown"),
+        "provider": envelope.get("provider", DEFAULT_PROVIDER),
+        "base_url": envelope.get("base_url", DEFAULT_BASE_URL),
+        "model": envelope.get("model", DEFAULT_MODEL),
     }
 
 
@@ -158,6 +164,15 @@ def error_payload(
         "error_text": str(error_text or "unknown error"),
         "elapsed_ms": elapsed_ms,
         "trigger_source": trigger_source,
+        "provider": envelope_or_request_id.get("provider", DEFAULT_PROVIDER)
+        if isinstance(envelope_or_request_id, Mapping)
+        else DEFAULT_PROVIDER,
+        "base_url": envelope_or_request_id.get("base_url", DEFAULT_BASE_URL)
+        if isinstance(envelope_or_request_id, Mapping)
+        else DEFAULT_BASE_URL,
+        "model": envelope_or_request_id.get("model", DEFAULT_MODEL)
+        if isinstance(envelope_or_request_id, Mapping)
+        else DEFAULT_MODEL,
     }
 
 
@@ -231,3 +246,56 @@ def rebuild_retry_envelope(
         api_key_source=str(last_envelope.get("api_key_source", "")),
         trigger_source=trigger_source,
     )
+
+
+def call_openai_compatible(envelope: Mapping[str, Any], opener: Any = None) -> Dict[str, Any]:
+    """POST a non-streaming chat completion request and normalize the result."""
+
+    started = time.perf_counter()
+    body = json.dumps(build_openai_chat_payload(envelope)).encode("utf-8")
+    request = urlrequest.Request(
+        endpoint_for(envelope),
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    timeout = float(envelope.get("timeout", DEFAULT_TIMEOUT_SECONDS))
+    open_request = opener or urlrequest.urlopen
+
+    try:
+        response = open_request(request, timeout=timeout)
+        status_code = int(getattr(response, "status", getattr(response, "code", 200)))
+        raw_text = response.read().decode("utf-8")
+        try:
+            json_data = json.loads(raw_text)
+        except json.JSONDecodeError:
+            json_data = None
+        return normalize_http_response(
+            envelope,
+            status_code=status_code,
+            json_data=json_data,
+            text=raw_text,
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+        )
+    except urlerror.HTTPError as exc:
+        text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
+        return normalize_http_response(
+            envelope,
+            status_code=int(getattr(exc, "code", 0) or 0),
+            text=text,
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+        )
+    except urlerror.URLError as exc:
+        return error_payload(
+            envelope,
+            error_kind=classify_exception(exc),
+            error_text=str(getattr(exc, "reason", exc)),
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+        )
+    except Exception as exc:
+        return exception_payload(
+            envelope, exc, elapsed_ms=(time.perf_counter() - started) * 1000
+        )
