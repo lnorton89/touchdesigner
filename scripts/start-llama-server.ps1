@@ -70,7 +70,7 @@ if ($ArgsList.Count -gt 0) {
 }
 Write-Host ""
 Write-Host "The server exposes an OpenAI-compatible API at:" -ForegroundColor Green
-Write-Host "  http://127.0.0.1:$($Port -gt 0 ? $Port : '8080')/v1" -ForegroundColor Green
+Write-Host "  http://127.0.0.1:$($(if ($Port -gt 0) { $Port } else { '8080' }))/v1" -ForegroundColor Green
 Write-Host ""
 Write-Host "Configure your Model Router with Provider = llama.cpp" -ForegroundColor Cyan
 Write-Host ""

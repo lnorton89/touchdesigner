@@ -7,8 +7,8 @@ from typing import Any, Dict, Mapping, Optional
 
 try:
     from . import router_http
-except ImportError:  # TouchDesigner source DAT imports may not be package-relative.
-    import router_http  # type: ignore
+except ImportError:
+    import router_http
 
 
 class ModelRouter:

@@ -56,7 +56,25 @@ The project occupies the same broad problem space as dotsimulate's Language Oper
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### .toe File Format (TouchDesigner Project Files)
+
+When generating .toe files programmatically (via toeexpand/toecollapse), these rules must be followed or TD will hang during load:
+
+1. **Every `.n` and `.parm` file must end with `\n` (0x0A).** TD's parser does not recognize `end` without a trailing newline and hangs waiting for more input.
+
+2. **Use LF-only line endings (`\n`, not `\r\n`).** Python's `write_text()` on Windows converts `\n` to `\r\n`. Always use `write_bytes(content.encode("utf-8"))` instead.
+
+3. **Never write an empty `.text` file.** A `.text` file with 1 empty row (length=0 content) hangs TD. Either:
+   - Omit the `.text` file entirely for empty Text DATs (TD creates blank text on its own), or
+   - Use 0-row format (`"0\n"`) if a file is required.
+
+4. **TOC file entry order must match template conventions:**
+   - Root files: `.build`, `.start`, `.grps`, then `project1.*`
+   - Project1 children: depth-first (parents before children), then alphabetically within each depth
+   - Perform/window files (`perform.*`) must come **after** all project1 content
+   - `.application` must be **last**
+
+5. **Preserve original `.build` version** — overwriting with a newer TD build number can cause issues.
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->

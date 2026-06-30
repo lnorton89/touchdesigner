@@ -1,7 +1,7 @@
 # LLM Operator Demo Project
 
 A complete TouchDesigner demo network demonstrating non-blocking LLM calls
-through the Model Router component.
+through the Model Router component. Pre-configured for llama.cpp by default.
 
 ## Project Layout
 
@@ -16,69 +16,55 @@ demo/
 
 ## Quick Start
 
-### 0. Open the demo project
-
-Double-click `demo/demo.toe` to open the pre-built TouchDesigner project,
-or run `File → Open` in TD. The network contains a `base_llm_demo` container
-with all operators pre-placed.
-
-To regenerate the `.toe` from source (requires TouchDesigner installed):
-
-```powershell
-python scripts/generate-demo-toe.py
-```
-
-### 1. Start an LLM server
+### 0. Start an LLM server (one time)
 
 ```powershell
 .\scripts\start-llama-server.ps1
 ```
 
-Or use Ollama:
+Or use Ollama (change Provider to `ollama` on the router):
 
 ```powershell
 ollama pull llama3.2
 ollama serve
 ```
 
-### 2. Create a new TD project
+### 1. Open the demo project
 
-Open TouchDesigner and create a new project file (File → New).
+Double-click `demo/demo.toe` to open the pre-built TouchDesigner project.
+The network self-configures — source DATs are pre-populated, Extension is
+set, and the startup script runs on load.
 
-### 3. Add startup script
+Default configuration:
+- **Provider**: `llama.cpp` (auto-resolves to `http://127.0.0.1:8080/v1`)
+- **Model**: `gemma-2-2b-it`
 
-- Create a Text DAT named `startup`
-- Copy `demo/startup.py` into it
-- In the DAT's Execute page: enable **Run ON Start**
-- The startup script injects the external venv (if `bootstrap-venv.ps1` was run)
-  and registers the demo module
+To regenerate the `.toe` from source:
 
-### 4. Build the network
+```powershell
+python scripts/generate-demo-toe.py
+```
 
-- Create a Text DAT named `build`
-- Copy `demo/build_network.py` into it
-- Click **Run Script** (or pulse the DAT Execute)
+### 2. Install dependencies (first time only)
 
-This creates a `base_llm_demo` container with all operators wired up.
+```powershell
+.\scripts\bootstrap-venv.ps1
+```
 
-### 5. Add callback source
+This creates a `.venv` in the project root with required packages.
+The startup DAT inside the `.toe` injects this venv at runtime.
 
-- Create a Text DAT named `callback_target`
-- Copy `demo/callbacks.py` into it
-- Set `Callbacktarget` on the router to point to this DAT
+### 3. Use it
 
-### 6. Wire source modules
+1. Type a prompt in **prompt_input** (Text DAT)
+2. Pulse **Trigger** on the router — status becomes `running`
+3. **Frame counter** keeps ticking (nonblocking proof)
+4. Response appears in **response_text**
+5. Errors appear in **error_text**
 
-Create Text DATs inside the router for the three source modules:
+## Manual Setup (for reference)
 
-| DAT Name | Source File |
-|----------|-------------|
-| `source_router_http` | `td_components/llm_model_router/router_http.py` |
-| `source_router_ext` | `td_components/llm_model_router/ModelRouterExt.py` |
-| `source_router_callbacks` | `td_components/llm_model_router/router_callbacks.py` |
-
-Set the router's Extension to `source_router_ext.ModelRouter` and enable
-**Python 3** and **Extension is My Class**.
+If building the network by hand instead of using the pre-built `.toe`:
 
 ## Network Layout
 

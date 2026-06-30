@@ -1,5 +1,13 @@
 """Generate TouchDesigner .toe files via toeexpand/toecollapse utilities.
 
+CRITICAL FORMAT RULES (TD hangs if violated):
+  1. Every .n and .parm file must end with \\n (0x0A) — TD parser needs it
+  2. Use LF-only line endings — Python write_text() on Windows adds CRLF
+  3. Never write .text with 1 empty row (0-length content) — omit instead
+  4. TOC order: .build, .start, .grps, project1.*, project1/ depth-first,
+     perform.*, .application last
+  5. See CONVENTIONS.md for the full reference
+
 Usage:
     from toe_builder import ToeBuilder, TextDat, Node, Params
 
@@ -78,6 +86,7 @@ class Node:
     color: str = "0.55 0.55 0.55"
     children: List[Node] = field(default_factory=list)
     params: Dict[str, str] = field(default_factory=dict)
+    parm_types: Dict[str, int] = field(default_factory=dict)
     text_content: Optional[str] = None
     table_content: Optional[List[List[str]]] = None
 
@@ -124,21 +133,34 @@ def collapse_toc(toc_path: Path, output_path: Optional[Path] = None) -> None:
 
 
 def encode_text_dat(rows: List[str]) -> bytes:
-    """Encode a list of text rows into TD's binary DAT format.
+    """Encode multi-line text into TD's binary cell format.
 
-    Format: row count as ASCII + '\\n', then for each row:
-      4 bytes little-endian length, then row data.
-    Row data: 2 bytes flags (0x0000) + content.
+    Format (reverse-engineered from TD examples):
+      "2\\n"                          = row count (always 2 in TNFile format)
+      row_length(4 LE)                = total for row header + cell content
+      column_count(4) = 1
+      field1(4) = 1
+      field2(4) = 1
+      field3(4) = 1
+      content_header(4) = 0x03000002  (= 02 00 00 03 in memory)
+      marker(1)                       = varies by content type (0x29 for most scripts)
+      text_content(N)                 = raw UTF-8 text
     """
-    buf = bytearray()
-    buf.extend(f"{len(rows)}\n".encode("ascii"))
+    text = "\n".join(rows)
+    text_bytes = text.encode("utf-8")
 
-    for row in rows:
-        row_bytes = row.encode("utf-8") if row else b""
-        flags = struct.pack("<H", 0x0000)
-        payload = flags + row_bytes
-        buf.extend(struct.pack("<I", len(payload)))
-        buf.extend(payload)
+    buf = bytearray()
+    buf.extend(b"2\n")                          # row count
+    row_header_size = 4 + 4 + 4 + 4 + 4 + 4 + 1  # total before text
+    row_total = row_header_size + len(text_bytes)
+    buf.extend(struct.pack("<I", row_total))    # row length
+    buf.extend(struct.pack("<I", 1))            # column count
+    buf.extend(struct.pack("<I", 1))            # field 1
+    buf.extend(struct.pack("<I", 1))            # field 2
+    buf.extend(struct.pack("<I", 1))            # field 3
+    buf.extend(b"\x02\x00\x00\x03")            # content header (0x03000002 LE)
+    buf.extend(b"\x23")                         # marker byte = '#'
+    buf.extend(text_bytes)                      # text content
 
     return bytes(buf)
 
@@ -189,19 +211,27 @@ def make_node_n(node: Node, parent_path: str = "") -> str:
     lines.append(f"flags =  {flags}")
     lines.append(f"color {node.color}")
     lines.append("end")
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def make_node_parms(node: Node) -> str:
-    """Generate the .parm file content for an operator."""
+    """Generate the .parm file content for an operator.
+
+    Uses node.params (name -> str value) as int/float params (type 0).
+    Uses node.parm_types (name -> type_code) to override type for specific params.
+    """
     if not node.params:
-        return "?\n?"
+        return "?\n?\n"
 
     lines = ["?"]
     for name, value in node.params.items():
-        lines.append(f"{name} 0 {value}")
+        ptype = node.parm_types.get(name, 0)
+        if ptype == 17:
+            lines.append(f'{name} {ptype} "{value}"')
+        else:
+            lines.append(f"{name} {ptype} {value}")
     lines.append("?")
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def make_node_network(children: List[Node]) -> str:
@@ -282,17 +312,20 @@ class ToeBuilder:
 
         Children are written into a subdirectory named after the parent node.
         """
-        # Write .n file
+        # Write .n file (use write_bytes to preserve LF-only line endings)
         n_content = make_node_n(node)
-        (base_path / f"{node.name}.n").write_text(n_content, encoding="utf-8")
+        (base_path / f"{node.name}.n").write_bytes(n_content.encode("utf-8"))
 
-        # Write .parm file
+        # Write .parm file (use write_bytes to preserve LF-only line endings)
         parm_content = make_node_parms(node)
-        (base_path / f"{node.name}.parm").write_text(parm_content, encoding="utf-8")
+        (base_path / f"{node.name}.parm").write_bytes(parm_content.encode("utf-8"))
 
-        # Write .text file for text DATs
-        if node.text_content is not None:
+        # Write .text file for text DATs (skip if empty — TD creates empty text on its own)
+        if node.text_content is not None and node.text_content != "":
             rows = node.text_content.split("\n")
+            # TD hangs on 1-row .text files — ensure at least 2 rows
+            if len(rows) == 1:
+                rows.append("")
             encoded = encode_text_dat(rows)
             (base_path / f"{node.name}.text").write_bytes(encoded)
 
@@ -387,19 +420,23 @@ class ToeBuilder:
 
         # Generate TOC with correct order: root files, project1/ children, .application last
         toc_lines = []
-        # Root files in canonical order (matching TD's default sort)
-        for name in [".build", ".start", ".grps", ".root", ".parm",
-                      "project1.n", "project1.parm", "project1.panel"]:
-            p = self._expanded_dir / name
-            if p.is_file():
+        # Root files in template-canonical order (.build, .start, .grps, then project1.*)
+        for name in [".build", ".start", ".grps", "project1.n", "project1.parm", "project1.panel"]:
+            if (self._expanded_dir / name).is_file():
                 toc_lines.append(name)
-        # project1/ children (recursive sort by path)
+        # project1/ children — sort by depth first (parents before children),
+        # then alphabetically within each depth level
         project_dir = self._expanded_dir / "project1"
         if project_dir.is_dir():
-            for f in sorted(project_dir.rglob("*")):
-                if f.is_file():
-                    rel = "project1/" + str(f.relative_to(project_dir)).replace("\\", "/")
-                    toc_lines.append(rel)
+            files = [f for f in project_dir.rglob("*") if f.is_file()]
+            files.sort(key=lambda p: (len(p.relative_to(project_dir).parts), str(p)))
+            for f in files:
+                rel = "project1/" + str(f.relative_to(project_dir)).replace("\\", "/")
+                toc_lines.append(rel)
+        # Perform/window files come after project1 content
+        for name in ["perform.n", "perform.parm"]:
+            if (self._expanded_dir / name).is_file():
+                toc_lines.append(name)
         # Application last
         if (self._expanded_dir / ".application").is_file():
             toc_lines.append(".application")
@@ -489,41 +526,65 @@ class ToeBuilder:
 # ── Script entry point ─────────────────────────────────────────────
 
 
+def _read_source(path: str) -> str:
+    """Read a Python source file from the td_components directory."""
+    full = Path(__file__).resolve().parent.parent / "td_components" / "llm_model_router" / path
+    if full.is_file():
+        return full.read_text(encoding="utf-8")
+    return f"# {path} — file not found\n"
+
+
 def generate_demo(output_path: str = "demo/demo.toe") -> Path:
-    """Generate the demo TouchDesigner project."""
+    """Generate the demo TouchDesigner project with pre-populated source code."""
     builder = ToeBuilder()
 
     # Main container
     demo = builder.add_container("base_llm_demo", x=200, y=100, w=600, h=400)
 
-    # Router component (inside demo)
-    router = Node(name="llm_model_router", optype="COMP", subtype="base",
-                  x=25, y=25, w=150, h=100, children=[
-        Node(name="source_router_http", optype="DAT", subtype="text",
-             x=25, y=140, w=130, h=90),
-        Node(name="source_router_ext", optype="DAT", subtype="text",
-             x=165, y=140, w=130, h=90),
-        Node(name="source_router_callbacks", optype="DAT", subtype="text",
-             x=305, y=140, w=130, h=90),
-    ])
+    # Router component with Extension configured and source DATs populated
+    router = Node(
+        name="llm_model_router", optype="COMP", subtype="base",
+        x=25, y=25, w=150, h=100,
+        params={
+            "extension1": 'me.op("ext_code").mod.__dict__["Extension"](me)',
+            "extname1": "ModelRouter",
+            "promoteextension1": "on",
+        },
+        parm_types={
+            "extension1": 256,
+            "extname1": 256,
+            "promoteextension1": 256,
+        },
+        children=[
+            Node(name="ext_code", optype="DAT", subtype="text",
+                 x=25, y=140, w=130, h=90,
+                 text_content="class Extension:\n    def __init__(self, ownerComp):\n        self.ownerComp = ownerComp\nExtension(me)"),
+            Node(name="router_http", optype="DAT", subtype="text",
+                 x=165, y=140, w=130, h=90,
+                 text_content=_read_source("router_http.py")),
+            Node(name="router_callbacks", optype="DAT", subtype="text",
+                 x=305, y=140, w=130, h=90,
+                 text_content=_read_source("router_callbacks.py")),
+        ],
+    )
     demo.children.append(router)
 
     # IO DATs (inside demo)
     prompt = Node(name="prompt_input", optype="DAT", subtype="text",
                   x=250, y=25, w=130, h=90,
-                  text_content="Type your prompt here and press Enter,\nor pulse Trigger on the router.")
+                  text_content="What is the capital of France?")
     demo.children.append(prompt)
 
     response_dat = Node(name="response_text", optype="DAT", subtype="text",
-                        x=400, y=25, w=130, h=90, text_content="")
+                        x=400, y=25, w=130, h=90)
     demo.children.append(response_dat)
 
     error_dat = Node(name="error_text", optype="DAT", subtype="text",
-                     x=250, y=150, w=130, h=90, text_content="")
+                     x=250, y=150, w=130, h=90)
     demo.children.append(error_dat)
 
     status_json = Node(name="status_json", optype="DAT", subtype="text",
-                       x=400, y=150, w=130, h=90, text_content="")
+                       x=400, y=150, w=130, h=90)
     demo.children.append(status_json)
 
     callback_target = Node(name="callback_target", optype="DAT", subtype="text",
@@ -531,7 +592,7 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
     demo.children.append(callback_target)
 
     callback_payload = Node(name="callback_payload", optype="DAT", subtype="text",
-                            x=250, y=280, w=200, h=90, text_content="")
+                            x=250, y=280, w=200, h=90)
     demo.children.append(callback_payload)
 
     # CHOPs
@@ -543,6 +604,32 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
                          x=475, y=25, w=100, h=80)
     demo.children.append(frame_counter)
 
+    # Startup script DAT (placed at root of base_llm_demo for visibility)
+    startup = Node(name="startup", optype="DAT", subtype="text",
+                   x=25, y=25, w=300, h=90,
+                   text_content=_read_startup())
+    demo.children.insert(0, startup)
+
+    # Test runner Execute DAT — runs onStart when file opens
+    test_runner = Node(
+        name="test_runner", optype="DAT", subtype="execute",
+        x=600, y=25, w=300, h=200,
+        flags="activate on parlanguage 0 viewer 1",
+        text_content=_TEST_RUNNER_SOURCE,
+        params={
+            "create": "on",
+            "language": "python",
+            "extension": "languageext",
+        },
+    )
+    demo.children.append(test_runner)
+
+    # Test results output DAT
+    test_results = Node(name="test_results", optype="DAT", subtype="text",
+                        x=600, y=250, w=300, h=200,
+                        flags="viewer 1 parlanguage 0")
+    demo.children.append(test_results)
+
     return builder.build(output_path)
 
 
@@ -553,6 +640,82 @@ def onRouterResult(payload):
         target.text = "\\n".join(f"{k}: {v}" for k, v in payload.items())
     return payload
 '''
+
+
+_STARTUP_SOURCE = '''"""TouchDesigner startup for LLM operator demo.
+Injects external venv and registers td_components on sys.path.
+Place this in a Text DAT named startup with Run ON Start enabled.
+"""
+import sys
+from pathlib import Path
+
+_venv_candidates = [
+    Path(__file__).resolve().parent.parent / ".venv",
+    Path.home() / ".td-llm-venv",
+]
+for _venv_root in _venv_candidates:
+    if _venv_root.is_dir():
+        _site_packages = _venv_root / "Lib" / "site-packages"
+        if _site_packages.is_dir() and str(_site_packages) not in sys.path:
+            sys.path.insert(0, str(_site_packages))
+        break
+
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+try:
+    from td_components.llm_model_router import router_http  # noqa: F811
+except ImportError:
+    pass
+'''
+
+
+_TEST_RUNNER_SOURCE = '''# me - this DAT
+# Runs on create. Direct execution, no deferral.
+
+def onCreate():
+    msg = ""
+    msg += "=== Model Router Tests ===\\n"
+
+    try:
+        p = parent()
+        msg += "PASS: parent=" + str(p) + "\\n"
+    except Exception as e:
+        msg += "FAIL: parent=" + str(e) + "\\n"
+
+    try:
+        r = p.op("llm_model_router")
+        msg += "PASS: router=" + str(r) + "\\n"
+    except Exception as e:
+        msg += "FAIL: router=" + str(e) + "\\n"
+
+    try:
+        ext = r.ext.ModelRouter
+        s = ext.state
+        msg += "PASS: ext state=" + str(s.get("state", "?")) + "\\n"
+    except Exception as e:
+        msg += "FAIL: ext=" + str(e) + "\\n"
+
+    try:
+        sc = p.op("status_channels")
+        msg += "PASS: status_channels=" + str(sc) + "\\n"
+    except Exception as e:
+        msg += "FAIL: status_channels=" + str(e) + "\\n"
+
+    msg += "=== Tests Complete ===\\n"
+    
+    # Write to test_results directly
+    try:
+        t = p.op("test_results")
+        if t:
+            t.text = msg
+    except:
+        pass
+'''
+
+def _read_startup() -> str:
+    return _STARTUP_SOURCE
 
 
 if __name__ == "__main__":
