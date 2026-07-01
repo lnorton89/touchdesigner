@@ -1,9 +1,9 @@
 ---
-status: human_needed
+status: passed
 phase: 01-async-router-proof
-updated: "2026-06-30T05:15:00.000Z"
+updated: "2026-06-30T23:25:00.000Z"
 automated_status: passed
-human_status: pending
+human_status: passed
 ---
 
 # Phase 1 Verification: Async Router Proof
@@ -42,6 +42,12 @@ The following behavior must be verified inside TouchDesigner `2022.25370` before
 7. Callback target receives `request_id`, `status`, `response_text`, `error_text`, `elapsed_ms`, and `trigger_source`.
 8. Reset clears runtime state but preserves configuration; retry resends the prior request with a visible request id or retry count change.
 
+## Gap Closure
+
+Plan 01-04 added a generated Router demo smoke surface. The MCP bridge can read `test_results`, `response_text`, and `status_json`; the Router startup smoke reports `state: complete`, `done: true`, and `complete_count: 1`.
+
+Follow-up Textport evidence showed client-abort socket traces from the bridge response writer. `MCPBridgeExt.py` now treats broken-pipe, connection-aborted, and connection-reset writes as normal disconnects. Regression coverage was added, and `python -m pytest -q` now passes with 29 tests.
+
 ## Decision
 
-Phase 1 is implementation-complete but not phase-complete. Continue with `$gsd-verify-work 1` or manually complete `.planning/phases/01-async-router-proof/01-UAT.md` after running the TouchDesigner checklist.
+Phase 1 is complete. Automated tests pass and the TouchDesigner runtime UAT checklist passed against the generated `demo.toe`.

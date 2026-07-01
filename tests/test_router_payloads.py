@@ -364,6 +364,62 @@ class ModelRouterTests(unittest.TestCase):
             owner.ext.ModelRouter.kwargs["trigger_source"], "dat_table_change"
         )
 
+    def test_router_writes_visible_dat_outputs_when_owner_has_parent_ops(self):
+        class FakeDat:
+            def __init__(self, text=""):
+                self.text = text
+
+        class Parent:
+            def __init__(self):
+                self.children = {
+                    "response_text": FakeDat(),
+                    "error_text": FakeDat(),
+                    "status_json": FakeDat(),
+                }
+
+            def op(self, name):
+                return self.children.get(name)
+
+        class Owner:
+            def __init__(self, parent):
+                self._parent = parent
+
+            def parent(self):
+                return self._parent
+
+        parent = Parent()
+        router = ModelRouter(ownerComp=Owner(parent))
+        request_id = router.request(prompt="hello", dispatch=False)
+        router.apply_result(
+            {
+                "request_id": request_id,
+                "status": "complete",
+                "response_text": "visible response",
+                "error_text": "",
+            }
+        )
+
+        self.assertEqual(parent.children["response_text"].text, "visible response")
+        self.assertEqual(parent.children["error_text"].text, "")
+        self.assertIn('"state": "complete"', parent.children["status_json"].text)
+        self.assertIn('"complete_count": 1', parent.children["status_json"].text)
+
+    def test_router_reads_prompt_dat_path_from_owner_context(self):
+        class FakeDat:
+            text = "prompt from dat"
+
+        class Parent:
+            def op(self, name):
+                return FakeDat() if name == "prompt_input" else None
+
+        class Owner:
+            def parent(self):
+                return Parent()
+
+        router = ModelRouter(ownerComp=Owner())
+
+        self.assertEqual(router._read_prompt_dat("prompt_input"), "prompt from dat")
+
 
 if __name__ == "__main__":
     unittest.main()

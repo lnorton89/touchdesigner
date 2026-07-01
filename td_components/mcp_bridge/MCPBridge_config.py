@@ -18,4 +18,9 @@ ROUTES: dict[str, str] = {
     "list_network_children": "list_network_children",
     "set_parameter": "set_parameter",
     "read_chop_channel": "read_chop_channel",
+    "router_demo_action": "router_demo_action",
+    "agent_demo_action": "agent_demo_action",
+    "tool_demo_action": "tool_demo_action",
+    "create_simple_comp": "create_simple_comp",
+    "create_dmx_controller": "create_dmx_controller",
 }

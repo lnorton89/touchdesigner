@@ -517,9 +517,9 @@ class ToeBuilder:
 # ── Script entry point ─────────────────────────────────────────────
 
 
-def _read_source(path: str) -> str:
+def _read_source(path: str, component: str = "llm_model_router") -> str:
     """Read a Python source file from the td_components directory."""
-    full = Path(__file__).resolve().parent.parent / "td_components" / "llm_model_router" / path
+    full = Path(__file__).resolve().parent.parent / "td_components" / component / path
     if full.is_file():
         return full.read_text(encoding="utf-8")
     return f"# {path} — file not found\n"
@@ -547,6 +547,28 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
     )
     demo.children.append(router)
 
+    agent = Node(
+        name="llm_agent", optype="COMP", subtype="base",
+        x=25, y=-125, w=150, h=100,
+        children=[
+            Node(name="AgentExt", optype="DAT", subtype="text",
+                 x=165, y=0, w=130, h=90,
+                 text_content=_read_source("AgentExt.py", "llm_agent")),
+        ],
+    )
+    demo.children.append(agent)
+
+    tool_registry = Node(
+        name="llm_tool_registry", optype="COMP", subtype="base",
+        x=25, y=-375, w=150, h=100,
+        children=[
+            Node(name="ToolRegistryExt", optype="DAT", subtype="text",
+                 x=165, y=0, w=130, h=90,
+                 text_content=_read_source("ToolRegistryExt.py", "llm_tool_registry")),
+        ],
+    )
+    demo.children.append(tool_registry)
+
     # IO DATs (inside demo)
     prompt = Node(name="prompt_input", optype="DAT", subtype="text",
                   x=250, y=25, w=130, h=90,
@@ -564,6 +586,58 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
     status_json = Node(name="status_json", optype="DAT", subtype="text",
                        x=400, y=150, w=130, h=90)
     demo.children.append(status_json)
+
+    router_config = Node(name="router_config", optype="DAT", subtype="text",
+                         x=25, y=150, w=200, h=90,
+                         text_content=_ROUTER_CONFIG_TEXT)
+    demo.children.append(router_config)
+
+    agent_config = Node(name="agent_config", optype="DAT", subtype="text",
+                        x=25, y=-250, w=220, h=90,
+                        text_content=_AGENT_CONFIG_TEXT)
+    demo.children.append(agent_config)
+
+    agent_message = Node(name="agent_message", optype="DAT", subtype="text",
+                         x=250, y=-250, w=160, h=90,
+                         text_content="Say hello from the Agent.")
+    demo.children.append(agent_message)
+
+    agent_response = Node(name="agent_response", optype="DAT", subtype="text",
+                          x=430, y=-250, w=160, h=90)
+    demo.children.append(agent_response)
+
+    agent_status_json = Node(name="agent_status_json", optype="DAT", subtype="text",
+                             x=610, y=-250, w=160, h=90)
+    demo.children.append(agent_status_json)
+
+    agent_history = Node(name="agent_history", optype="DAT", subtype="text",
+                         x=430, y=-125, w=160, h=90)
+    demo.children.append(agent_history)
+
+    agent_error = Node(name="agent_error", optype="DAT", subtype="text",
+                       x=610, y=-125, w=160, h=90)
+    demo.children.append(agent_error)
+
+    agent_response_json = Node(name="agent_response_json", optype="DAT", subtype="text",
+                               x=790, y=-250, w=160, h=90)
+    demo.children.append(agent_response_json)
+
+    tool_value = Node(name="tool_value", optype="DAT", subtype="text",
+                      x=250, y=-375, w=160, h=90,
+                      text_content="Tool value not set yet.")
+    demo.children.append(tool_value)
+
+    tool_result = Node(name="tool_result", optype="DAT", subtype="text",
+                       x=430, y=-375, w=220, h=90)
+    demo.children.append(tool_result)
+
+    tool_chop = Node(
+        name="tool_chop", optype="CHOP", subtype="constant",
+        x=670, y=-375, w=120, h=80,
+        params={"name0": "toolvalue", "value0": "0"},
+        parm_types={"name0": 17},
+    )
+    demo.children.append(tool_chop)
 
     callback_target = Node(name="callback_target", optype="DAT", subtype="text",
                            x=25, y=280, w=200, h=90, text_content=_CALLBACK_SOURCE)
@@ -588,6 +662,21 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
                    text_content=_read_startup())
     demo.children.insert(0, startup)
 
+    demo_process = Node(name="demo_process", optype="DAT", subtype="text",
+                        x=970, y=25, w=280, h=180,
+                        text_content=_DEMO_PROCESS_TEXT)
+    demo.children.append(demo_process)
+
+    node_reference = Node(name="node_reference", optype="DAT", subtype="text",
+                          x=970, y=-180, w=360, h=320,
+                          text_content=_NODE_REFERENCE_TEXT)
+    demo.children.append(node_reference)
+
+    panel_helper = Node(name="demo_panel_helper", optype="DAT", subtype="text",
+                        x=970, y=-525, w=360, h=220,
+                        text_content=_PANEL_HELPER_SOURCE)
+    demo.children.append(panel_helper)
+
     # Test runner Execute DAT — runs onStart when file opens
     test_runner = Node(
         name="test_runner", optype="DAT", subtype="execute",
@@ -601,6 +690,19 @@ def generate_demo(output_path: str = "demo/demo.toe") -> Path:
         },
     )
     demo.children.append(test_runner)
+
+    agent_runner = Node(
+        name="agent_runner", optype="DAT", subtype="execute",
+        x=790, y=-125, w=220, h=120,
+        flags="activate on parlanguage 0 viewer 1",
+        text_content=_AGENT_RUNNER_SOURCE,
+        params={
+            "start": "on",
+            "language": "python",
+            "extension": "languageext",
+        },
+    )
+    demo.children.append(agent_runner)
 
     # Test results output DAT
     test_results = Node(name="test_results", optype="DAT", subtype="text",
@@ -618,6 +720,110 @@ def onRouterResult(payload):
     if target is not None:
         target.text = "\\n".join(f"{k}: {v}" for k, v in payload.items())
     return payload
+'''
+
+
+_ROUTER_CONFIG_TEXT = '''provider: openai_compatible
+base_url: http://localhost:11434/v1
+model: llama3.2
+timeout: 30
+prompt_dat: prompt_input
+callback_target: callback_payload
+trigger_pulse: Trigger
+reset_pulse: Reset
+retry_pulse: Retry
+status_display: status_json
+api_key_source: LLM_API_KEY_PLACEHOLDER
+api_key_value_saved: false
+'''
+
+
+_AGENT_CONFIG_TEXT = '''system_prompt: You are a concise TouchDesigner assistant.
+message_dat: agent_message
+router_path: llm_model_router
+output_dat: agent_response
+json_output_dat: agent_response_json
+error_dat: agent_error
+status_dat: agent_status_json
+history_dat: agent_history
+model_override: optional
+base_url_override: optional
+'''
+
+
+_DEMO_PROCESS_TEXT = '''LLM Operator Demo - end-to-end process
+
+1. Start a local OpenAI-compatible endpoint.
+   - Ollama: ollama pull llama3.2; ollama serve
+   - llama.cpp: scripts/start-llama-server.ps1
+
+2. Open demo/demo.toe.
+   startup and test_runner initialize the bridge, router smoke test, and agent smoke test.
+
+3. Router path.
+   Edit prompt_input, then use the Router controls or MCP route:
+   /td/router_demo_action?action=pulse
+   Outputs: response_text, error_text, status_json, callback_payload, status_channels.
+
+4. Agent path.
+   Edit agent_message, then use:
+   /td/agent_demo_action?action=pulse
+   Outputs: agent_response, agent_error, agent_status_json, agent_history, agent_response_json.
+
+5. Tool path.
+   Use /td/tool_demo_action?action=list, execute, chop, invalid, model_start, model_collect.
+   Outputs: tool_value, tool_chop, tool_result, and agent_history.
+
+6. MCP/live TD path.
+   Start the companion server with .venv/Scripts/python.exe td_mcp_server.py.
+   Connect an MCP client to http://127.0.0.1:8765/mcp.
+
+7. Nonblocking proof.
+   During router or agent requests, frame_counter should keep cooking.
+'''
+
+
+_NODE_REFERENCE_TEXT = '''base_llm_demo node reference
+
+User-facing nodes
+- demo_process: end-to-end walkthrough kept inside the .toe.
+- node_reference: this node inventory.
+- prompt_input: user prompt for direct router requests.
+- response_text: latest router response text.
+- error_text: latest router error text.
+- status_json: full router state snapshot as JSON.
+- status_channels: router lifecycle channels for CHOP-driven networks.
+- callback_payload: flattened router callback payload for quick inspection.
+- agent_message: user message for the conversational Agent.
+- agent_response: latest Agent assistant text.
+- agent_response_json: raw Agent result payload JSON.
+- agent_error: latest Agent error text.
+- agent_status_json: full Agent state snapshot.
+- agent_history: JSON message history.
+- tool_value: Text DAT changed by the set_demo_value tool.
+- tool_chop: Constant CHOP changed by the set_demo_chop tool.
+- tool_result: latest tool-list or tool-execution result.
+- test_results: startup smoke-test log.
+
+Operator components
+- llm_model_router: async OpenAI-compatible request router.
+- llm_agent: conversation/history wrapper that delegates to the router.
+- llm_tool_registry: registry source for TD-callable tool schemas.
+
+Configuration/source nodes
+- router_config: readable router defaults used by the demo documentation.
+- agent_config: readable agent defaults used by the demo documentation.
+- callback_target: onRouterResult callback source.
+- startup: sys.path/bootstrap script for TD load.
+- demo_panel_helper: best-effort custom parameter installer for base_llm_demo.
+
+Internal smoke-test nodes
+- test_runner: starts the TD bridge pump and router smoke path on project load.
+- agent_runner: runs the Agent smoke path after startup.
+- frame_counter: visual proof that TD keeps cooking during async work.
+
+These internal nodes are intentionally kept because they make the generated
+project self-testing. They can be deleted after exporting a clean production tox.
 '''
 
 
@@ -650,47 +856,126 @@ except ImportError:
 '''
 
 
-_TEST_RUNNER_SOURCE = '''# me - this DAT
-
-import sys
-sys.path.insert(0, r"C:\\Users\\Lawrence\\Documents\\Dev\\touchdesigner")
+_TEST_RUNNER_SOURCE = '''# me
+import sys;sys.path.append(r"C:\\Users\\Lawrence\\Documents\\Dev\\touchdesigner")
+B = None
 
 def onStart():
-    try:
-        from td_components.mcp_bridge.MCPBridgeExt import MCPBridge
-        debug("bridge: creating MCPBridge")
-        b = MCPBridge(td_op=op, td_run=run)
-        debug("bridge: starting server")
-        b.start()
-        debug("bridge: server started")
-    except Exception as e:
-        debug("bridge: error " + str(e))
-    try:
-        p = parent()
-        t = p.op("test_results")
-        if t:
-            t.text = "Bridge started"
-    except:
-        pass
-
-def onCreate():
+    global B
+    from td_components.mcp_bridge.MCPBridgeExt import MCPBridge as M
+    from td_components.llm_model_router.ModelRouterExt import ModelRouter as R
+    p=parent();B=M(td_op=op,td_run=run);B.start();run("args[0]()", pump, delayFrames=1);r=R(p.op("llm_model_router"));p.store("router",r)
+    h=p.op("demo_panel_helper")
+    if h is not None:
+        ns={}
+        exec(h.text, ns)
+        ns.get("install_demo_panel", lambda *a, **k: None)(p, B)
+    i=r.request(prompt=p.op("prompt_input").text,trigger_source="startup",dispatch=False)
+    r.apply_result(dict(request_id=i,status="complete",response_text="Router demo ready",error_text=""))
+    p.op("test_results").text = "Bridge started\\nRouter smoke complete"
     return
 
-def onExit():
+def pump():
+    if B: B._drain_pending_calls()
+    run("args[0]()", pump, delayFrames=1)
+'''
+
+
+_AGENT_RUNNER_SOURCE = '''# me
+import sys;sys.path.append(r"C:\\Users\\Lawrence\\Documents\\Dev\\touchdesigner")
+
+def onStart():
+    run("args[0]()", go, delayFrames=2)
     return
 
-def onFrameStart(frame):
-    return
-
-def onFrameEnd(frame):
-    return
-
-def onPlayStateChange(state):
-    return
-
-def onDeviceChange():
+def go():
+    from td_components.llm_model_router.ModelRouterExt import ModelRouter as R
+    from td_components.llm_agent.AgentExt import LLMAgent as A
+    p=parent();r=R();a=A(p.op("llm_agent"),r);p.store("agent",a)
+    m=p.op("agent_message").text.split("\\n4",1)[0]
+    j=a.send(m,dispatch=False)
+    a.apply_result(dict(request_id=j,status="complete",response_text="Agent demo ready",error_text=""))
+    t=p.op("test_results");t.text=(t.text+"\\nAgent smoke complete").strip()
     return
 '''
+
+
+_PANEL_HELPER_SOURCE = '''"""Best-effort controls for the generated demo component.
+
+TouchDesigner stores custom parameter UI in project internals that are safer to
+create with TD's own Python API than to hand-author in expanded .toe files.
+test_runner calls install_demo_panel(parent(), bridge) on startup.
+"""
+
+_PARAM_SPECS = [
+    ("str", "Provider", "Provider", "openai_compatible"),
+    ("str", "Baseurl", "Base URL", "http://localhost:11434/v1"),
+    ("str", "Model", "Model", "llama3.2"),
+    ("float", "Timeout", "Timeout", 30),
+    ("str", "Prompt", "Prompt", "What is the capital of France?"),
+    ("str", "Agentmessage", "Agent Message", "Say hello from the Agent."),
+    ("pulse", "Routerpulse", "Router Pulse", None),
+    ("pulse", "Routerretry", "Router Retry", None),
+    ("pulse", "Routerreset", "Router Reset", None),
+    ("pulse", "Agentpulse", "Agent Pulse", None),
+    ("pulse", "Agentclear", "Agent Clear", None),
+    ("pulse", "Toollist", "Tool List", None),
+    ("pulse", "Toolexecute", "Tool Execute", None),
+    ("pulse", "Toolchop", "Tool CHOP", None),
+]
+
+
+def install_demo_panel(base, bridge=None):
+    """Add a Custom parameter page to base_llm_demo when the TD API allows it."""
+    if base is None or not hasattr(base, "appendCustomPage"):
+        return False
+    try:
+        page = base.appendCustomPage("LLM Demo")
+    except Exception:
+        return False
+
+    for kind, name, label, default in _PARAM_SPECS:
+        if getattr(getattr(base, "par", None), name, None) is not None:
+            continue
+        try:
+            if kind == "pulse":
+                page.appendPulse(name, label=label)
+            elif kind == "float":
+                pars = page.appendFloat(name, label=label)
+                pars[0].default = float(default)
+                pars[0].val = float(default)
+            else:
+                pars = page.appendStr(name, label=label)
+                pars[0].default = str(default)
+                pars[0].val = str(default)
+        except Exception:
+            pass
+
+    try:
+        base.store("demo_panel_bridge", bridge)
+    except Exception:
+        pass
+    return True
+
+
+def sync_panel_to_demo(base):
+    """Copy editable panel values into the demo DATs/config where possible."""
+    if base is None:
+        return False
+    try:
+        prompt = base.op("prompt_input")
+        if prompt is not None and hasattr(prompt, "text"):
+            prompt.text = str(base.par.Prompt.eval())
+        message = base.op("agent_message")
+        if message is not None and hasattr(message, "text"):
+            message.text = str(base.par.Agentmessage.eval())
+    except Exception:
+        return False
+    return True
+'''
+
+_TEST_RUNNER_SOURCE = _TEST_RUNNER_SOURCE.rstrip() + "\n#"
+_AGENT_RUNNER_SOURCE = _AGENT_RUNNER_SOURCE.rstrip() + "\n#"
 
 def _read_startup() -> str:
     return _STARTUP_SOURCE

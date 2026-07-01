@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import json
 from typing import Any, Dict, Mapping, Optional
 
 try:
@@ -61,12 +62,37 @@ class ModelRouter:
         messages: Optional[list[Mapping[str, Any]]] = None,
         trigger_source: str = "pulse",
         dispatch: bool = True,
+        config_overrides: Optional[Mapping[str, Any]] = None,
     ) -> int:
+        envelope = self.build_request_envelope(
+            prompt=prompt,
+            messages=messages,
+            trigger_source=trigger_source,
+            config_overrides=config_overrides,
+        )
+        self._mark_running(envelope)
+        self._write_outputs()
+        if dispatch:
+            self._submit_worker(envelope)
+        return int(envelope["request_id"])
+
+    def build_request_envelope(
+        self,
+        prompt: Optional[str] = None,
+        messages: Optional[list[Mapping[str, Any]]] = None,
+        trigger_source: str = "pulse",
+        config_overrides: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Build a validated Router request envelope without dispatching it."""
         config = self._read_config()
+        if config_overrides:
+            for key in ("provider", "base_url", "model", "timeout", "api_key_source"):
+                if key in config_overrides and config_overrides[key] not in (None, ""):
+                    config[key] = config_overrides[key]
         if prompt is None and messages is None:
             prompt = self._read_prompt_dat(config.get("prompt_dat"))
 
-        envelope = router_http.build_request_envelope(
+        return router_http.build_request_envelope(
             provider=config["provider"],
             base_url=config["base_url"],
             model=config["model"],
@@ -78,11 +104,6 @@ class ModelRouter:
             api_key_source=config["api_key_source"],
             trigger_source=trigger_source,
         )
-        self._mark_running(envelope)
-        self._write_outputs()
-        if dispatch:
-            self._submit_worker(envelope)
-        return int(envelope["request_id"])
 
     def reset(self) -> Dict[str, Any]:
         self._state = "idle"
@@ -182,6 +203,10 @@ class ModelRouter:
             return ""
         if hasattr(prompt_dat_ref, "text"):
             return str(prompt_dat_ref.text)
+        if isinstance(prompt_dat_ref, str):
+            op_obj = self._lookup_output_op(prompt_dat_ref)
+            if op_obj is not None and hasattr(op_obj, "text"):
+                return str(op_obj.text)
         return str(prompt_dat_ref)
 
     def _mark_running(self, envelope: Mapping[str, Any]) -> None:
@@ -222,7 +247,41 @@ class ModelRouter:
         }
 
     def _write_outputs(self) -> None:
-        """Plan 02 writes DAT/CHOP outputs on the TouchDesigner side."""
+        """Write Router state into conventional demo DAT outputs when present."""
+        snapshot = self._snapshot_state()
+        self._write_text_dat("response_text", self._response_text)
+        self._write_text_dat("error_text", self._error_text)
+        self._write_text_dat("status_json", json.dumps(snapshot, indent=2, default=str))
+
+    def _write_text_dat(self, name: str, text: str) -> None:
+        dat = self._lookup_output_op(name)
+        if dat is not None and hasattr(dat, "text"):
+            dat.text = text
+
+    def _lookup_output_op(self, name_or_path: str) -> Any:
+        if not self.ownerComp:
+            return None
+
+        if "/" in name_or_path:
+            op_lookup = getattr(self.ownerComp, "op", None)
+            if callable(op_lookup):
+                result = op_lookup(name_or_path)
+                if result is not None:
+                    return result
+
+        parent = getattr(self.ownerComp, "parent", None)
+        parent_obj = parent() if callable(parent) else parent
+        if parent_obj is not None:
+            op_lookup = getattr(parent_obj, "op", None)
+            if callable(op_lookup):
+                result = op_lookup(name_or_path)
+                if result is not None:
+                    return result
+
+        op_lookup = getattr(self.ownerComp, "op", None)
+        if callable(op_lookup):
+            return op_lookup(name_or_path)
+        return None
 
     def _invoke_callback(self, payload: Mapping[str, Any]) -> None:
         envelope = self._last_envelope or {}

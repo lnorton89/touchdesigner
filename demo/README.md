@@ -1,104 +1,185 @@
 # LLM Operator Demo Project
 
-A complete TouchDesigner demo network demonstrating non-blocking LLM calls
-through the Model Router component. Pre-configured for llama.cpp by default.
+`demo/demo.toe` is the end-to-end TouchDesigner demo for the native LLM operator family. It shows the Router, Agent, Tool Registry, and MCP Bridge working together without blocking the TD main thread.
 
-## Project Layout
-
-```
-demo/
-├── README.md               ← this file
-├── callbacks.py            ← Callback and utility functions for TD
-├── build_network.py        ← TD script that auto-constructs the network
-├── startup.py              ← Startup script for venv injection + module registration
-└── demo.toe                ← Auto-generated TouchDesigner project (open this)
-```
-
-## Quick Start
-
-### 0. Start an LLM server (one time)
+The project is generated from `scripts/toe_builder.py`. Regenerate it after source changes with:
 
 ```powershell
-.\scripts\start-llama-server.ps1
+python scripts/generate-demo-toe.py
 ```
 
-Or use Ollama (change Provider to `ollama` on the router):
+## End-To-End Use
+
+### 1. Install the external environment
+
+TouchDesigner should not be used as the package install target. Install dependencies into the project venv:
+
+```powershell
+.\scripts\bootstrap-venv.ps1
+```
+
+### 2. Start a local model endpoint
+
+Use Ollama:
 
 ```powershell
 ollama pull llama3.2
 ollama serve
 ```
 
-### 1. Open the demo project
-
-Double-click `demo/demo.toe` to open the pre-built TouchDesigner project.
-The network self-configures — source DATs are pre-populated, Extension is
-set, and the startup script runs on load.
-
-Default configuration:
-- **Provider**: `llama.cpp` (auto-resolves to `http://127.0.0.1:8080/v1`)
-- **Model**: `gemma-2-2b-it`
-
-To regenerate the `.toe` from source:
+Or use the llama.cpp helper:
 
 ```powershell
-python scripts/generate-demo-toe.py
+.\scripts\start-llama-server.ps1
 ```
 
-### 2. Install dependencies (first time only)
+Default demo settings use OpenAI-compatible URLs:
+
+| Provider | URL |
+|---|---|
+| Ollama | `http://localhost:11434/v1` |
+| llama.cpp | `http://127.0.0.1:8080/v1` |
+
+### 3. Open the demo
+
+Open `demo/demo.toe` in TouchDesigner. The startup smoke path should write to `test_results`:
+
+```text
+Bridge started
+Router smoke complete
+Agent smoke complete
+```
+
+The generated file also contains `demo_process` and `node_reference` Text DATs inside `base_llm_demo`, so the walkthrough travels with the `.toe`.
+
+### 4. Use the Router path
+
+1. Edit `prompt_input`.
+2. Trigger a router request from the generated demo controls when the Custom parameter page is available, or through the MCP route:
+
+```text
+/td/router_demo_action?action=pulse
+```
+
+3. Read the outputs:
+
+| Node | Output |
+|---|---|
+| `response_text` | latest response text |
+| `error_text` | latest error |
+| `status_json` | full router state |
+| `status_channels` | CHOP lifecycle channels |
+| `callback_payload` | flattened callback payload |
+
+Useful route actions: `pulse`, `retry`, `reset`, `dat_change`, `slow`, `error`, `local_endpoint`, `collect`.
+
+### 5. Use the Agent path
+
+1. Edit `agent_message`.
+2. Trigger an agent request:
+
+```text
+/td/agent_demo_action?action=pulse
+```
+
+3. Read `agent_response`, `agent_status_json`, `agent_history`, `agent_error`, and `agent_response_json`.
+
+Useful route actions: `pulse`, `clear`, `local_endpoint`, `collect`.
+
+### 6. Use the Tool path
+
+The Tool Registry demo exposes two TD-side tools:
+
+| Tool | Effect |
+|---|---|
+| `set_demo_value` | writes `tool_value` |
+| `set_demo_chop` | writes `tool_chop.par.value0` |
+
+Drive it through the bridge route:
+
+```text
+/td/tool_demo_action?action=list
+/td/tool_demo_action?action=execute
+/td/tool_demo_action?action=chop
+```
+
+Useful route actions: `list`, `execute`, `chop`, `invalid`, `model_start`, `model_collect`.
+
+### 7. Use the MCP Bridge
+
+Start the companion MCP server outside TouchDesigner:
 
 ```powershell
-.\scripts\bootstrap-venv.ps1
+.\.venv\Scripts\python.exe td_mcp_server.py
 ```
 
-This creates a `.venv` in the project root with required packages.
-The startup DAT inside the `.toe` injects this venv at runtime.
+Connect an MCP client to:
 
-### 3. Use it
-
-1. Type a prompt in **prompt_input** (Text DAT)
-2. Pulse **Trigger** on the router — status becomes `running`
-3. **Frame counter** keeps ticking (nonblocking proof)
-4. Response appears in **response_text**
-5. Errors appear in **error_text**
-
-## Manual Setup (for reference)
-
-If building the network by hand instead of using the pre-built `.toe`:
-
-## Network Layout
-
-```
-base_llm_demo (Base COMP)
-├── llm_model_router          ← Model Router (extension: ModelRouter)
-│   ├── source_router_http    ← HTTP layer (Text DAT)
-│   ├── source_router_ext     ← Extension class (Text DAT)
-│   └── source_router_callbacks ← Callbacks (Text DAT)
-├── prompt_input              ← Your prompt goes here (Text DAT)
-├── response_text             ← LLM response appears here (Text DAT)
-├── status_json               ← Status snapshot as JSON (Text DAT)
-├── error_text                ← Error details (Text DAT)
-├── status_channels           ← Lifecycle CHOP channels (CHOP)
-├── callback_target           ← demo_callbacks module (Text DAT)
-├── callback_payload          ← Raw callback payload (Text DAT)
-├── frame_counter             ← FPS counter for nonblocking proof (CHOP)
-└── startup                   ← Startup script (Text DAT)
+```text
+http://127.0.0.1:8765/mcp
 ```
 
-## Verifying It Works
+The TD-side bridge listens on `http://127.0.0.1:9876` and is started by the demo smoke runner.
 
-1. **Pulse Trigger** — status becomes `running`
-2. **Frame counter** keeps ticking during the request (nonblocking proof)
-3. **Response** appears in `response_text`
-4. **Edit prompt_input** — triggers a request via `dat_table_change`
-5. **Set Baseurl to `http://localhost:9/v1`** — error appears in `error_text`
-6. **Pulse Reset** — runtime state clears
-7. **Pulse Retry** — resends last request with incremented retry count
+## Main Component Controls
 
-## Export as .tox
+On project load, `test_runner` calls `demo_panel_helper.install_demo_panel(parent(), bridge)`. When TouchDesigner allows runtime custom parameter creation, `base_llm_demo` gets an `LLM Demo` custom parameter page with editable provider/model/prompt fields and named Router, Agent, and Tool action pulses.
 
-Once the network works, right-click `base_llm_demo` → Export Component → Save
-as `LLM-Router-Demo.tox`. This single `.tox` contains everything needed to
-drop the demo into any TD project.
+The helper avoids hand-authoring fragile expanded `.toe` panel internals. The route-backed actions above remain the canonical controls until a dedicated Parameter Execute DAT is added for custom pulse callbacks. If a TD build blocks runtime custom parameters, use the visible DATs and MCP demo routes above; the demo still works.
 
-See `tox/STRUCTURE.md` for detailed export instructions.
+## Node Reference
+
+### User-Facing Nodes
+
+| Node | Purpose |
+|---|---|
+| `demo_process` | In-project end-to-end walkthrough. |
+| `node_reference` | In-project inventory of generated nodes. |
+| `prompt_input` | Prompt for direct Router requests. |
+| `response_text` | Latest Router response text. |
+| `error_text` | Latest Router error text. |
+| `status_json` | Full Router state JSON. |
+| `status_channels` | Router lifecycle CHOP channels. |
+| `callback_payload` | Flattened Router callback payload. |
+| `agent_message` | User message for Agent requests. |
+| `agent_response` | Latest Agent assistant text. |
+| `agent_response_json` | Raw Agent result payload. |
+| `agent_error` | Latest Agent error text. |
+| `agent_status_json` | Full Agent state JSON. |
+| `agent_history` | JSON conversation history. |
+| `tool_value` | Text DAT mutated by `set_demo_value`. |
+| `tool_chop` | Constant CHOP mutated by `set_demo_chop`. |
+| `tool_result` | Latest tool list/execution result. |
+| `test_results` | Startup smoke-test log. |
+
+### Operator Components
+
+| Node | Purpose |
+|---|---|
+| `llm_model_router` | Async OpenAI-compatible request router. |
+| `llm_agent` | Conversation/history layer that delegates to the Router. |
+| `llm_tool_registry` | Tool schema and execution registry source. |
+
+### Configuration And Source Nodes
+
+| Node | Purpose |
+|---|---|
+| `router_config` | Human-readable Router defaults for the demo. |
+| `agent_config` | Human-readable Agent defaults for the demo. |
+| `callback_target` | Router callback source. |
+| `startup` | Venv/path bootstrap script. |
+| `demo_panel_helper` | Runtime custom parameter installer. |
+
+### Internal Smoke-Test Nodes
+
+| Node | Purpose |
+|---|---|
+| `test_runner` | Starts the TD bridge pump and Router smoke path. |
+| `agent_runner` | Runs the Agent smoke path after startup. |
+| `frame_counter` | Visual nonblocking proof while requests are running. |
+
+These internal nodes are intentionally kept because they make the generated project self-testing. For a production `.tox`, you can remove `test_runner`, `agent_runner`, `test_results`, `demo_process`, and `node_reference` after validating the exported component.
+
+## Regeneration Notes
+
+The `.toe` is generated through `toeexpand`/`toecollapse`. Do not hand-edit expanded files unless needed. If you do, preserve the project conventions from `AGENTS.md`: LF endings, trailing newlines for `.n`/`.parm`, no empty one-row `.text` files, and canonical TOC ordering.
